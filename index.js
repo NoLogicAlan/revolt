@@ -473,21 +473,20 @@ class Remix {
   getPlayer(message, promptJoin=true, verifyUser=true) {
     var askVC = (msg) => {
       return new Promise(res => {
-        const channels = [];
         if (msg.channel.type === "Group") {
           return this.joinChannel(msg, msg.channel.id, (p) => {
-            p.once("roomfetched", () => { // TODO: implement this in %join
-              if (p.connection.users.find(u => u.id == msg.authorId)) return;
+            if (!p.connection.users.find(u => u.id == message.author.id)) {
               msg.reply(this.em("You don't seem to be connected to <#" + msg.channel.id + ">. Did you forget to join?", msg), true);
-            });
+            }
+            /*p.once("roomfetched", () => { // TODO: implement this in %join
+            console.log("room fetched");
+            if (p.connection.users.find(u => u.id == msg.authorId)) return;
+            msg.reply(this.em("You don't seem to be connected to <#" + msg.channel.id + ">. Did you forget to join?", msg), true);
+            });*/
             res(msg.channel.id);
           }, () => { m.edit(this.em("Something went wrong. Unable to join <#" + msg.channel.id + ">. Do I have the needed permission?", m)); return res(false); });
         }
-        var iterator = msg.channel.server.channels.entries();
-        for (let v = iterator.next(); !v.done; v = iterator.next()) {
-          if (v.value[1].type != "VoiceChannel") continue;
-          channels.push(v.value[1]);
-        }
+        const channels = msg.channel.server.channels.filter(c => c.isVoice);
         if (channels.length != 0) { // TODO: translate
           var channelSelection = "Please select one of the following channels by clicking on the reactions below\n\n";
           var reactions = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];//[":one:",":two:",":three:",":four:",":five:",":six:",":seven:",":eight:",":nine:"];
@@ -509,10 +508,14 @@ class Remix {
             const idx = reactions.findIndex(r => r == e.emoji_id);
             const c = channels[idx];
             this.joinChannel(msg, c.id, (p) => {
-              p.once("roomfetched", () => { // TODO: implement this in %join
+              if (!p.connection.users.find(u => u.id == message.author.id)) {
+                msg.reply(this.em("You don't seem to be connected to <#" + c.id + ">. Did you forget to join?", msg), true);
+              }
+              /*p.once("roomfetched", () => { // TODO: implement this in %join
+               console.log("room fetched");
                 if (p.connection.users.find(u => u.id == msg.authorId)) return;
                 msg.reply(this.em(this.t("voice.join.warning.nc", m, {channel: "<#" + c.id + ">"}), msg), true);
-              });
+              );*/
               res(c.id);
             }, () => { m.edit(this.em(this.t("voice.join.error.perms", m, {channel: "<#" + c.id + ">"}), m)); return res(false); });
 
@@ -532,7 +535,10 @@ class Remix {
             const channel = this.handler.formatString(m.content, m, "voiceChannel");
             this.unobserveUser(observer);
             this.unobserveReactions(roid);
-            this.joinChannel(m, channel, () => {
+            this.joinChannel(m, channel, (p) => {
+              if (!p.connection.users.find(u => u.id == message.author.id)) {
+                msg.reply(this.em("You don't seem to be connected to <#" + channel + ">. Did you forget to join?", msg), true);
+              }
               res(channel);
             }, () => { join(msg); });
           });
@@ -541,7 +547,7 @@ class Remix {
       });
     }
     return new Promise(async res => {
-      const user = this.revoice.getUser(message.authorId).user;
+      const user = this.revoice.getUser(message.authorId).user; // TODO: search through channels of server
       var cid = (user) ? user.connectedTo : null;
       if (message.channel.type === "Group") cid = message.channel.id;
       var player = this.playerMap.get(cid);

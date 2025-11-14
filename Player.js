@@ -432,9 +432,13 @@ class RevoltPlayer extends EventEmitter {
         //console.log(connection);
 				this.connection = connection;
 				connection.once("join", res);
-				connection.on("roomfetched", () => { this.emit("roomfetched", connection.users) });
+        var roomFetched = false;
+				connection.on("roomfetched", () => { if (roomFetched) return; roomFetched = true; this.emit("roomfetched", connection.users) });
 				this.connection.on("state", (state) => {
-					console.log("state", state);
+          console.log(state);
+          if (state == Revoice.State.IDLE && !roomFetched) {
+            this.emit("roomfetched", connection.users)
+          }
 					this.state = state;
 					if (state == Revoice.State.OFFLINE && !this.leaving) {
 						this.emit("autoleave");
