@@ -159,6 +159,7 @@ class Option {
     this.choices = []; // only for choice options
     this.translations = {};
     this.defaultValue = null;
+    this.dynamicDefault = null;
 
     return this;
   }
@@ -209,6 +210,10 @@ class Option {
   }
   setDefault(value) {
     this.defaultValue = value;
+    return this;
+  }
+  setDynamicDefault(callback) {
+    this.dynamicDefault = callback;
     return this;
   }
   empty(i) {
@@ -648,6 +653,10 @@ class CommandHandler extends EventEmitter {
         value = value.slice(1, value.length - 1);
       }
       let valid = o.validateInput(value, this.client, msg);
+      if (!valid && o.dynamicDefault) {
+        value = o.dynamicDefault(this.client, msg);
+        valid = o.validateInput(value, this.client, msg);
+      }
       if (!valid && (o.required || !o.empty(value))) { // TODO: improve checking on optional options
         let e = o.typeError.replace(/\$optionType/gi, o.type).replace(/\$previousCmd/gi, previous).replace(/\$currValue/gi, value).replace(/\$optionName/gi, o.name);
         return (!external) ? this.replyHandler(e, msg) : e;
