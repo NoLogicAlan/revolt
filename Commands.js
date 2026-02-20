@@ -23,10 +23,10 @@ class CommandBuilder extends EventEmitter {
     return this;
   }
   guid() {
-    var S4 = function() {
-       return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
+    var S4 = function () {
+      return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
     };
-    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
+    return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
   }
   get command() {
     return (this.parent) ? this.parent.command + " " + this.name : this.name;
@@ -59,32 +59,32 @@ class CommandBuilder extends EventEmitter {
     this.subcommands.push(sub);//new SubcommandBuilder()));
     return this;
   }
-  addStringOption(config, flag=false) {
+  addStringOption(config, flag = false) {
     this.options.push(config(Option.create("string", flag)))
     return this;
   }
-  addNumberOption(config, flag=false) {
+  addNumberOption(config, flag = false) {
     this.options.push(config(Option.create("number", flag)));
     return this;
   }
-  addBooleanOption(config, flag=false) {
+  addBooleanOption(config, flag = false) {
     this.options.push(config(Option.create("boolean", flag)));
     return this;
   }
-  addChannelOption(config, flag=false) {
+  addChannelOption(config, flag = false) {
     this.options.push(config(Option.create("channel", flag)));
     return this;
   }
-  addUserOption(config, flag=false) {
+  addUserOption(config, flag = false) {
     this.options.push(config(Option.create("user", flag)));
     return this;
   }
   addTextOption(config) {
-    if (this.options.findIndex(e=>e.type=="text") !== -1) throw "There can only be 1 text option.";
+    if (this.options.findIndex(e => e.type == "text") !== -1) throw "There can only be 1 text option.";
     this.options.push(config(new Option("text")));
     return this;
   }
-  addChoiceOption(config, flag=false) {
+  addChoiceOption(config, flag = false) {
     this.options.push(config(Option.create("choice", flag)));
     return this;
   }
@@ -146,7 +146,7 @@ class Option {
   userRegex = /^(<|<\\)@(?<id>[A-Z0-9]+)>/;
   idRegex = /^(?<id>[A-Z0-9]+)/;
 
-  constructor(type="string") {
+  constructor(type = "string") {
     this.name = null;
     this.description = null;
     this.required = false
@@ -163,14 +163,14 @@ class Option {
 
     return this;
   }
-  static create(type, flag=false) {
+  static create(type, flag = false) {
     return (!flag) ? new Option(type) : new Flag(type);
   }
   guid() {
-    var S4 = function() {
-       return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
+    var S4 = function () {
+      return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
     };
-    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
+    return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
   }
   setName(n) {
     this.name = n;
@@ -222,7 +222,7 @@ class Option {
     return (!i && !i.contains("0")); // check if string is empty
   }
   validateInput(i, client, msg, type) {
-    switch(type || this.type) {
+    switch (type || this.type) {
       case "text":
       case "string":
         return !!i; // check if string is empty
@@ -253,8 +253,8 @@ class Option {
         const channel = client.channels.find(
           c => c.name == i
             && (msg.channel)
-              ? (c.serverId == msg.channel.serverId || c.serverId == "eval") // eval is a dry-run conducted to check the syntax of a channel
-              : false);
+            ? (c.serverId == msg.channel.serverId || c.serverId == "eval") // eval is a dry-run conducted to check the syntax of a channel
+            : false);
 
         const cObj = (results) ? client.channels.get(results.groups["id"]) : (channel) ? channel : null;
         return (cObj) ? cObj.isVoice || cObj.type === "Group" : null;
@@ -296,7 +296,7 @@ class Option {
   }
   get typeError() {
     if (this.tError) return this.tError;
-    switch(this.type) { // TODO: translate
+    switch (this.type) { // TODO: translate
       case "choice":
         let e = "Invalid value '$currValue'. The option `$optionName` has to be one of the following options: \n";
         e += "- " + this.choices.join("\n- ");
@@ -320,7 +320,7 @@ class Option {
   }
 }
 class Flag extends Option {
-  constructor(type="string") {
+  constructor(type = "string") {
     if (type == "text") throw "Flags can't be of type 'text'!";
     super(type);
   }
@@ -339,11 +339,11 @@ class CommandHandler extends EventEmitter {
   customHelp = false;
   helpHandler = null;
 
-  requiredPermissions = ["SendMessage"];
+  requiredPermissions = ["SendMessage", "SendEmbeds"];
 
   invalidFlagError = "Invalid flag `$invalidFlag`. It doesn't match any options on this command.\n`$previousCmd $invalidFlag`";
 
-  constructor(client, prefix="!") {
+  constructor(client, prefix = "!") {
     super();
 
     this.client = client;
@@ -364,7 +364,7 @@ class CommandHandler extends EventEmitter {
     }
     this.translationHandler = null;
 
-    this.client.on("messageCreate", (msg)=>this.messageHandler(msg))
+    this.client.on("messageCreate", (msg) => this.messageHandler(msg))
 
     return this;
   }
@@ -375,16 +375,37 @@ class CommandHandler extends EventEmitter {
     return this.customPrefixes.get(guildId);
   }
   checkPermissions(message) {
+    const missing = [];
+
     for (let i = 0; i < this.requiredPermissions.length; i++) {
-      let perm = this.requiredPermissions[i];
+      const perm = this.requiredPermissions[i];
       if (!message.channel.havePermission(perm)) {
-        message.member.user.openDM().then(dm => {
-          dm.sendMessage("Please grant me the `" + perm + "` permission in <#" + message.channel.id + "> or contact a server administrator. I am unable to operate without this.");
-        }).catch(() => {});
-        return false;
+        missing.push(perm);
       }
     }
-    return true;
+
+    if (missing.length === 0) return true;
+
+    const permList = missing.map(p => `\`${p}\``).join(", ");
+    const channelMention = `<#${message.channel.id}>`;
+
+    // Can't send messages at all → DM only
+    if (missing.includes("SendMessage")) {
+      message.member?.user?.openDM().then(dm => {
+        dm.sendMessage(`Please grant me the following permission(s) in ${channelMention}: ${permList}`);
+      }).catch(() => { });
+      return false;
+    }
+
+    // Can send messages but missing other perms → notify in channel
+    message.reply(`Please grant me the following permission(s) in ${channelMention}: ${permList}`).then(() => { }, () => {
+      // Fallback to DM
+      message.member?.user?.openDM().then(dm => {
+        dm.sendMessage(`Please grant me the following permission(s) in ${channelMention}: ${permList}`);
+      }).catch(() => { });
+    });
+
+    return false;
   }
   messageHandler(msg) {
     if (!msg || !msg.content) return;
@@ -403,17 +424,17 @@ class CommandHandler extends EventEmitter {
     }
     const prefix = this.getPrefix(msg.channel.serverId);
     const ping = `<@${this.client.user.id}> `;
-		if (!(msg.content.startsWith(prefix) || msg.content.replace(/\u00A0/gi, " ") .startsWith(ping))) return;
+    if (!(msg.content.startsWith(prefix) || msg.content.replace(/\u00A0/gi, " ").startsWith(ping))) return;
     if (!this.checkPermissions(msg)) return;
     const len = (msg.content.startsWith(prefix)) ? prefix.length : ping.length;
-		console.log(msg.content);
+    console.log(msg.content);
     const args = msg.content
-			.replace(/\u00A0/gi, " ")
+      .replace(/\u00A0/gi, " ")
       .slice(len)
       .trim()
       .split(" ")
       .map((el) => el.trim())
-		console.log(args);
+    console.log(args);
     if (args[0] === this.acceptCommand && this.fixMap.has(msg.authorId)) {
       //if (!this.fixMap.has(msg.author_id)) return this.replyHandler(this.f("No command stored that can be corrected!"));
       let cmd = this.fixMap.get(msg.authorId);
@@ -447,7 +468,7 @@ class CommandHandler extends EventEmitter {
         return this.replyHandler(this.genCommandHelp(currCmd, msg), msg);
       } else {
         let idx = this.commands.findIndex(e => e.aliases.filter(al => al.toLowerCase() == args[1].toLowerCase()).length > 0);
-        if (idx === -1) return this.replyHandler(this.f(this.t("Unknown command `$prefix" + args[1] + "`!", "cmdHandler.command.invalid", msg, {command: "`$prefix" + args[1] + "`"}), msg.channel.serverId), msg);
+        if (idx === -1) return this.replyHandler(this.f(this.t("Unknown command `$prefix" + args[1] + "`!", "cmdHandler.command.invalid", msg, { command: "`$prefix" + args[1] + "`" }), msg.channel.serverId), msg);
         return this.replyHandler(this.genCommandHelp(this.commands[idx], msg), msg);
       }
     }
@@ -461,7 +482,7 @@ class CommandHandler extends EventEmitter {
           command: c
         }
       });
-      matches.sort((a,b) => b.score-a.score);
+      matches.sort((a, b) => b.score - a.score);
       if (matches[0].score < this.minMatchScore) return; // unknown command, not similar to existing one
 
       // match found, suggest to user
@@ -469,12 +490,12 @@ class CommandHandler extends EventEmitter {
       this.fixMap.set(msg.authorId, { cmd: cmd, args: args });
 
       let fixed = matches[0].command + " " + args.slice(1).join(" ");
-      this.replyHandler(this.f(this.t("Did you mean `$prefix" + fixed + "`? (Type `$prefix$accept` to run this)", "cmdHandler.command.suggestion", msg, { command: "`$prefix" + fixed + "`", acceptCommand: "`$prefix$accept`"}), msg.channel.serverId), msg);
+      this.replyHandler(this.f(this.t("Did you mean `$prefix" + fixed + "`? (Type `$prefix$accept` to run this)", "cmdHandler.command.suggestion", msg, { command: "`$prefix" + fixed + "`", acceptCommand: "`$prefix$accept`" }), msg.channel.serverId), msg);
       return;
     }
     return this.processCommand(this.commands.find(e => e.aliases.includes(args[0].toLowerCase())), args, msg);
   }
-  calcMatch(word, base, insensitive=true) {
+  calcMatch(word, base, insensitive = true) {
     insensitive = (insensitive) ? "i" : "";
     let matching = 0;
     let used = [];
@@ -558,7 +579,7 @@ class CommandHandler extends EventEmitter {
     text = text.replace(/\$helpCmd/gi, this.helpCommand);
     return text;
   }
-  processCommand(cmd, args, msg, previous=false, external=false) { // external: called by something outside of command handler
+  processCommand(cmd, args, msg, previous = false, external = false) { // external: called by something outside of command handler
     if (cmd.requirements.length > 0 && !external) {
       const server = msg.member.server;
       for (let i = 0; i < cmd.requirements.length; i++) {
@@ -707,10 +728,10 @@ class CommandHandler extends EventEmitter {
       commandId: cmd.id,
       options: opts,
       message: msg,
-      get: function(oName) {
+      get: function (oName) {
         return this.options.find(o => o.name == oName);
       },
-      getById: function(id) {
+      getById: function (id) {
         return this.options.find(o => o.id == id);
       }
     };
@@ -750,10 +771,10 @@ class CommandHandler extends EventEmitter {
     const translated = this.translationHandler(key, msg, options);
     return (translated == key) ? def : translated;
   }
-  getHelpPages(cmdLimit=5) {
+  getHelpPages(cmdLimit = 5) {
     return Math.ceil(this.commands.length / cmdLimit);
   }
-  getHelpPage(cmdLimit=5, currPage=0, msg, ...cmds) {
+  getHelpPage(cmdLimit = 5, currPage = 0, msg, ...cmds) {
     const split = (cmdLimit < cmds.length);
     if (!split) return this.genHelp(null, msg, false, ...cmds); // no need to chunk it into pages
 
@@ -764,7 +785,7 @@ class CommandHandler extends EventEmitter {
 
     return this.genHelp({ curr: currPage + 1, max, offset }, msg, false, ...commands);
   }
-  genHelp(page=null, message, paginate=false, ...cmds) {
+  genHelp(page = null, message, paginate = false, ...cmds) {
     // TODO: make help more customizable
     if (cmds.length == 0) cmds.push(...this.userCommands(this.commands));
     cmds = this.userCommands(cmds);
@@ -808,7 +829,7 @@ class CommandHandler extends EventEmitter {
     let content = "# " + this.capitalize(cmd.name) + "\n";
     content += this.getDescription(cmd, msg) + "\n\n";
     content += "#### Usage: \n🖥️ `" + this.genCmdUsage(cmd, msg, "` `") + "`\n\n";
-    if (cmd.examples.length > 0) content += "Example(s): \n- `" + cmd.examples.map(e => this.f(e,  msg?.channel?.serverId)).join("`\n- `") + "`\n\n";
+    if (cmd.examples.length > 0) content += "Example(s): \n- `" + cmd.examples.map(e => this.f(e, msg?.channel?.serverId)).join("`\n- `") + "`\n\n";
     if (cmd.aliases.length > 1) {
       content += "#### Aliases: \n";
       cmd.aliases.forEach(alias => {
@@ -841,15 +862,15 @@ class CommandHandler extends EventEmitter {
     if (cmd.requirements.length > 0) { // TODO: add requirement inheritance (displaying parent requirements on subcommand help page)
       content += "#### Requirements: \n";
       cmd.requirements.forEach(r => {
-        content += "- " + r.getPermissions().map(e=>"Permission `" + e + "`").join("\n- ")
+        content += "- " + r.getPermissions().map(e => "Permission `" + e + "`").join("\n- ")
       });
     }
 
     return content.trim();
   }
-  genCmdUsage(cmd, msg, pre=" ") {
+  genCmdUsage(cmd, msg, pre = " ") {
     if (cmd.subcommands.length > 0) {
-      return cmd.command + " <" + cmd.subcommands.map(e=>e.name).join(" | ") + "> [...]".trim();
+      return cmd.command + " <" + cmd.subcommands.map(e => e.name).join(" | ") + "> [...]".trim();
     } else {
       let options = this.f("$prefix" + cmd.command, msg?.channel?.serverId);
       cmd.options.forEach(o => {
@@ -857,7 +878,7 @@ class CommandHandler extends EventEmitter {
         if (o instanceof Flag) return options += pre + ((o.type == "choice") ? "-" + o.aliases[0] + " <" + o.choices.join(" | ") + ">" : " -" + o.aliases[0] + " '" + o.type + "'");
         options += pre + ((o.type == "choice") ? " <" + o.choices.join(" | ") + ">" : " '" + o.name + ": " + o.type + "'");
       });
-      let o = cmd.options.find(e=>e.type=="text");
+      let o = cmd.options.find(e => e.type == "text");
       if (o) options += pre + "'" + o.name + ": " + o.type + "'";
       return options.trim();
     }
