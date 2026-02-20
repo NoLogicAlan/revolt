@@ -398,7 +398,7 @@ class CommandHandler extends EventEmitter {
     }
 
     // Can send messages but missing other perms → notify in channel
-    message.reply(`Please grant me the following permission(s) in ${channelMention}: ${permList}`).then(() => { }, () => {
+    message.reply(`I need the following permission(s) to work properly here: ${permList}`).then(() => { }, () => {
       // Fallback to DM
       message.member?.user?.openDM().then(dm => {
         dm.sendMessage(`Please grant me the following permission(s) in ${channelMention}: ${permList}`);
@@ -906,3 +906,4 @@ class CommandHandler extends EventEmitter {
 }
 
 module.exports = { CommandHandler, CommandBuilder };
+
