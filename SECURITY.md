@@ -19,4 +19,5 @@ I should usually be able to get back to you within 3 days. I'll let you know if 
 
 ---
 
-&copy; 2025 Remix. All Rights Reserved.
+&copy; 2026 Remix. All Rights Reserved.
+

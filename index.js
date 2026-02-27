@@ -22,7 +22,12 @@ if (fs.existsSync("./config.json")) {
 
 class Remix {
   constructor() {
-    this.client = new Client(config["revolt.js"]);
+    this.client = new Client({
+      ...config["revolt.js"],
+      autoReconnect: true,
+      api_url: "https://api.stoat.chat/0.8",
+      heartbeatInterval: 45000
+    });
     this.client.config = config;
     this.config = config;
     this.modules = require("./storage/modules.json");
@@ -786,13 +791,7 @@ class Remix {
     const pref = this.handler.getPrefix(msg.channel.serverId);
     const categories = [{ // TODO: improve this text
       reaction: "🏠",
-      content: [`# Home\n\n \
-      Welcome to Remix' help.
-      Remix is Revolt's first open-source music bot. It supports a variety of streaming services and has many features, \
-      with one of the newest being the [Web Dashboard](https://remix.fairuse.org/).\n\n \
-      We hope you enjoy using Remix!\n\n \
-      To get started, just click on the reactions below to find more about the commands.
-      In the case that reactions don't work for you, there's also the possiblity to look through them by using \`${pref}help <page number>\` :)`],
+      content: [`# Home\n\nWelcome to the Remix help page.\n\nRemix is Stoat's first open-source music bot. It supports a variety of streaming services and has many features, with one of the newest being the [Web Dashboard](https://remix.fairuse.org/).\n\nWe hope you enjoy using Remix!\n\nTo get started, just click on the reactions below to find out more about the commands. In the case that reactions don't work for you, there's also the possibility to look through them by using \`${pref}help <page number>\` :)`],
       form: "$content\n\n###### Page $currPage/$maxPage",
       title: "Home Page"
     }, {
@@ -810,8 +809,8 @@ class Remix {
       content: [`If you need help with anything or encounter any issues, hop over to our support server [Remix HQ](/invite/Remix)!\n
       Alternatively, you can write a dm to any of the following people:
       - <@01FZ5P08W36B05M18FP3HF4PT1> (Community Manager & Developer)
-      - <@01FVB1ZGCPS8TJ4PD4P7NAFDZA> (Revolt & Discord Bot Developer)
-      - <@01G9MCW5KZFKT2CRAD3G3B9JN5> (Lead Developer)`],
+      - <@01G9MCW5KZFKT2CRAD3G3B9JN5> (Lead Developer)
+      - <@01FVB1ZGCPS8TJ4PD4P7NAFDZA> (Junior Developer)`],
       form: "# Support\n\n$content\n\n###### Page $currPage/$maxPage",
       title: "Support Info"
     }]; // TODO: add status, or news page

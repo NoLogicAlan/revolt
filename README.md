@@ -87,7 +87,7 @@ check the README in the `settings` folder.
 
 ## Connecting To A Self-Hosted Instance
 
-If you don't want to connect to the official Revolt instance, you need to fill out the `stoat.js` and `stoat-api` configuration values in your config file.
+If you don't want to connect to the official Stoat instance, you need to fill out the `stoat.js` and `stoat-api` configuration values in your config file.
 
 Please refer to the [stoat.js docs](https://stoat.js.org/classes/Client.html#constructor) for `stoat.js` and to [oapi's docs](https://github.com/insertish/oapi#example) for `stoat-api`.
 
@@ -107,7 +107,10 @@ If you have any questions or would like to talk with other Remix users you can j
 
 ---
 
-&copy; 2025 Remix. All Rights Reserved.
+&copy; 2026 Remix. All Rights Reserved.
+
+
+
 
 
 
