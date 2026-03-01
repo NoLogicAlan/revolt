@@ -467,16 +467,51 @@ class RevoltPlayer extends EventEmitter {
 
         const passThrough = new PassThrough();
         stream = passThrough;
+        let ytdlpFallbackTriggered = false;
+
         proc.stdout.pipe(passThrough);
 
         proc.stderr.on("data", async (d) => {
+          if (ytdlpFallbackTriggered) return;
           const msg = d.toString();
-          if (msg.includes("Sign in") || msg.includes("confirm you’re not a bot")) {
+          // Broad match — catches any auth/block variant YouTube may send
+          const isBlocked = (
+            msg.includes("Sign in") ||
+            msg.includes("bot") ||
+            msg.includes("HTTP Error 403") ||
+            msg.includes("HTTP Error 429") ||
+            msg.includes("Precondition") ||
+            msg.includes("This video is not available") ||
+            msg.includes("blocked") ||
+            msg.includes("login") ||
+            msg.includes("Private video") ||
+            msg.includes("Video unavailable")
+          );
+          if (isBlocked) {
+            ytdlpFallbackTriggered = true;
             console.warn("[Player] yt-dlp blocked. Switching to youtubei.js...");
+            proc.stdout.unpipe(passThrough);
+            proc.kill();
             const fallback = await this.getYoutubeiStream(videoId);
             if (fallback) {
-              proc.kill();
-              connection.media.playStream(fallback);
+              fallback.pipe(passThrough);
+            } else {
+              passThrough.destroy(new Error("Both yt-dlp and youtubei.js failed"));
+            }
+          }
+        });
+
+        // Safety net: yt-dlp exits non-zero but stderr didn't match any known pattern
+        proc.on("close", async (code) => {
+          if (ytdlpFallbackTriggered) return;
+          if (code !== 0 && !passThrough.destroyed) {
+            ytdlpFallbackTriggered = true;
+            console.warn("[Player] yt-dlp exited with code", code, "— falling back to youtubei.js...");
+            const fallback = await this.getYoutubeiStream(videoId);
+            if (fallback) {
+              fallback.pipe(passThrough);
+            } else {
+              passThrough.destroy(new Error("Both yt-dlp and youtubei.js failed"));
             }
           }
         });
