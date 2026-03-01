@@ -1,60 +1,108 @@
 const EventEmitter = require("events");
 const { Revoice, MediaPlayer } = require("revoice.js");
 const { Worker } = require('worker_threads');
-const ytdl = require('ytdl-core');
-const Uploader = require("revolt-uploader");
-const https = require('https');
-const Spotify = require('spotifydl-core').default;
-const scdl = require('soundcloud-downloader').default;
-const meta = require("./src/probe.js");
+const { Innertube, Platform } = require("youtubei.js"); // replaces ytdl-core
+const { PassThrough } = require("stream");
+const { spawn } = require("child_process");
+const fs = require('fs');
 
+// Tell youtubei.js how to evaluate YouTube's obfuscated JS for URL deciphering.
+// Uses Node's built-in Function constructor — no extra packages needed.
+Platform.shim.eval = async (data, env) => {
+  const properties = [];
+  if (env.n) properties.push(`n: exportedVars.nFunction("${env.n}")`);
+  if (env.sig) properties.push(`sig: exportedVars.sigFunction("${env.sig}")`);
+  const code = `${data.output}\nreturn { ${properties.join(', ')} }`;
+  return new Function(code)();
+};
+
+// Shared Innertube instance
+let _innertube = null;
+async function getInnertube() {
+  if (!_innertube) {
+    _innertube = await Innertube.create({
+      retrieve_player: true,
+      generate_session_locally: true,
+      // Using Firefox User Agent
+      user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+      client_type: 'WEB',
+      // Visitor data helps stabilize the v1/player 400 errors
+      visitor_data: 'CgtSdl9RSl9uX3dfdyiAgpWyBg%3D%3D'
+    });
+
+    _innertube.session.on('auth-pending', (data) => {
+      console.log(`\n[!] YOUTUBE LOGIN: Go to ${data.verification_url} and enter: ${data.user_code}\n`);
+    });
+
+    _innertube.session.on('auth', (data) => {
+      console.log('[Player] youtubei.js successfully authenticated.');
+      fs.writeFileSync('./yt_auth.json', JSON.stringify(data.credentials));
+    });
+
+    _innertube.session.on('update-credentials', (data) => {
+      fs.writeFileSync('./yt_auth.json', JSON.stringify(data.credentials));
+    });
+
+    if (fs.existsSync('./yt_auth.json')) {
+      const creds = JSON.parse(fs.readFileSync('./yt_auth.json'));
+      try {
+        await _innertube.session.signIn(creds);
+      } catch (e) {
+        console.error("[Player] Session expired, re-authenticating...");
+        await _innertube.session.signIn();
+      }
+    } else {
+      await _innertube.session.signIn();
+    }
+  }
+  return _innertube;
+}
 class RevoltPlayer extends EventEmitter {
   constructor(token, opts) {
     super();
-
     this.voice = opts.voice || new Revoice(token, undefined, opts.client);
-    this.connection = {
-      state: Revoice.State.OFFLINE
-    }
+    this.connection = { state: Revoice.State.OFFLINE };
     this.upload = opts.uploader || new Uploader(opts.client, true);
-
     this.spotify = opts.spotifyClient || new Spotify(opts.spotify);
     this.spotifyConfig = opts.spotify;
-
     this.ytdlp = opts.ytdlp;
 
-    this.gClient = opts.geniusClient || new (require("genius-lyrics")).Client();
-
-    this.port = 3050 + (opts.portOffset || 0);
-    this.updateHandler = (content, msg) => {
-      msg.edit({ content: content });
+    if (this.ytdlp && typeof this.ytdlp.binaryPath === "string") {
+      const { execFile } = require("child_process");
+      execFile(this.ytdlp.binaryPath, ["-U"], (err, stdout, stderr) => {
+        if (err) console.warn("[Player] yt-dlp update check failed:", err.message);
+        else console.log("[Player] yt-dlp update:", (stdout || stderr || "up to date").split("\n")[0]);
+      });
     }
+
+    this.gClient = opts.geniusClient || new (require("genius-lyrics")).Client();
+    this.port = 3050 + (opts.portOffset || 0);
+    this.updateHandler = (content, msg) => { msg.edit({ content: content }); }
     this.messageChannel = opts.messageChannel;
-
     this.LEAVE_TIMEOUT = opts.lTimeout || 45;
-
     this.YT_API_KEY = opts.ytKey;
     this.token = token;
     this.REVOLT_CHAR_LIMIT = 1950;
     this.resultLimit = 5;
-
     this.startedPlaying = null;
-
     this.searches = new Map();
-
-    this.data = {
-      queue: [],
-      current: null,
-      loop: false,
-      loopSong: false
-    };
+    this._channelData = new Map();
 
     return this;
+  }
+  // Returns the isolated queue/state for the currently active channel.
+  // Falls back to a shared "global" slot if no channelId is set yet.
+  get data() {
+    const key = this.connection?.channelId || "_global";
+    if (!this._channelData.has(key)) {
+      this._channelData.set(key, { queue: [], current: null, loop: false, loopSong: false });
+    }
+    return this._channelData.get(key);
   }
   setUpdateHandler(handler) {
     this.updateHandler = handler;
   }
-  workerJob(jobId, data, onMessage=null, msg=null) {
+  workerJob(jobId, data, onMessage = null, msg = null) {
     return new Promise((res, rej) => {
       const worker = new Worker('./worker.js', { workerData: { jobId, data } });
       worker.on("message", (data) => {
@@ -68,14 +116,14 @@ class RevoltPlayer extends EventEmitter {
           res(data.data);
         }
       });
-      worker.on("exit", (code) => { if (code == 0) rej(code)});
+      worker.on("exit", (code) => { if (code == 0) rej(code) });
     });
   }
   guid() {
-    var S4 = function() {
-       return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
+    var S4 = function () {
+      return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
     };
-    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
+    return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
   }
 
   shuffleArr(a) {
@@ -103,7 +151,7 @@ class RevoltPlayer extends EventEmitter {
       }).catch(res(false));
     });
   }
-  addToQueue(data, top=false) {
+  addToQueue(data, top = false) {
     this.emit("queue", {
       type: "add",
       data: {
@@ -167,7 +215,7 @@ class RevoltPlayer extends EventEmitter {
   }
 
   // utility commands
-  getVidName(vid, code=false) {
+  getVidName(vid, code = false) {
     if (vid.type === "radio") {
       if (code) {
         return "[Radio]: " + vid.title + " - " + vid.author.url + "";
@@ -272,16 +320,16 @@ class RevoltPlayer extends EventEmitter {
 
     let loopqueue = (this.data.loop) ? "**enabled**" : "**disabled**";
     let songloop = (this.data.loopSong) ? "**enabled**" : "**disabled**";
-		const vol = ((this.connection?.preferredVolume || 1) * 100) + "%";
-		const paused = !!this.connection?.media.paused; // TODO: integrate
+    const vol = ((this.connection?.preferredVolume || 1) * 100) + "%";
+    const paused = !!this.connection?.media.paused; // TODO: integrate
     if (this.data.current.type === "radio") {
       const data = await meta(this.data.current.url);
-      return { msg: "Streaming **[" + this.data.current.title + "](" + this.data.current.author.url + ")**\n\n" + this.data.current.description + " \n\n### Current song: " + data.title + "\n\nVolume: " + vol +  "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail()}
+      return { msg: "Streaming **[" + this.data.current.title + "](" + this.data.current.author.url + ")**\n\n" + this.data.current.description + " \n\n### Current song: " + data.title + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() }
     }
     if (this.data.current.type === "external") {
-			return { msg: "Playing **[" + this.data.current.title + "](" + this.data.current.url + ") by [" + this.data.current.artist + "](" + this.data.current.author.url + ")** \n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail()}
+      return { msg: "Playing **[" + this.data.current.title + "](" + this.data.current.url + ") by [" + this.data.current.artist + "](" + this.data.current.author.url + ")** \n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() }
     }
-		return { msg: "Playing: **[" + this.data.current.title + "](" + this.data.current.url + ")** (" + this.getCurrentElapsedDuration() + "/" + this.getCurrentDuration() + ")" + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() };
+    return { msg: "Playing: **[" + this.data.current.title + "](" + this.data.current.url + ")** (" + this.getCurrentElapsedDuration() + "/" + this.getCurrentDuration() + ")" + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() };
   }
   uploadThumbnail() {
     return new Promise((res) => {
@@ -324,52 +372,121 @@ class RevoltPlayer extends EventEmitter {
   }
 
   // functional core
-  streamResource(url) {
-    return new Promise(res => {
-      require("https").get(url, function (response) {
-        res(response);
-      });
-    });
+  async streamResource(url) {
+    const axios = require('axios');
+    const response = await axios({ method: 'get', url: url, responseType: 'stream' });
+    return response.data;
   }
+
+  async getYoutubeiStream(videoId) {
+    try {
+      const innertube = await getInnertube();
+      // Try TV and ANDROID clients as they have less strict PoToken requirements currently
+      const clients = ["TV", "ANDROID", "YTMUSIC", "WEB"];
+      let webStream = null;
+      let lastErr = null;
+
+      for (const client of clients) {
+        try {
+          webStream = await innertube.download(videoId, { type: "audio", quality: "best", client });
+          console.log("[Player] youtubei.js stream acquired via client:", client);
+          break;
+        } catch (e) {
+          console.warn(`[Player] client ${client} failed:`, e.message);
+          lastErr = e;
+        }
+      }
+
+      if (!webStream) throw lastErr;
+
+      const passThrough = new PassThrough();
+      const reader = webStream.getReader();
+      (async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) { passThrough.end(); break; }
+            passThrough.write(value);
+          }
+        } catch (e) {
+          passThrough.destroy(e);
+        }
+      })();
+      return passThrough;
+    } catch (err) {
+      console.error("[Player] youtubei.js fallback failed:", err.message);
+      return null;
+    }
+  }
+
   async playNext() {
-    if (this.data.queue.length === 0 && !this.data.loopSong) { this.data.current = null; this.emit("stopplay"); return false; }
+    if (this.data.queue.length === 0 && !this.data.loopSong) {
+      this.data.current = null;
+      this.emit("stopplay");
+      return false;
+    }
+
     const current = this.data.current;
     const songData = (this.data.loopSong && current) ? current : this.data.queue.shift();
     if (current && this.data.loop && !this.data.loopSong) this.data.queue.push(current);
+
     if (!this.data.loopSong) {
       this.emit("queue", {
         type: "update",
-        data: {
-          current: songData,
-          old: current,
-          loop: this.data.loop
-        }
+        data: { current: songData, old: current, loop: this.data.loop }
       });
     }
 
     this.data.current = songData;
-
     const connection = this.voice.getVoiceConnection(this.connection.channelId);
-    //this.ytdlp.exec(("--ffmpeg-location " + ffmpeg + " -x --audio-format mp3 " + songData.url + " -o output.mp3").split(" "));
-    const stream = (songData.type == "soundcloud") ?
-      await scdl.download(songData.url)
-      :
-      (songData.type == "external" || songData.type == "radio") ?
-        //this.ytdlp.execStream(("--ffmpeg-location " + ffmpeg + " -x --audio-format mp3 " + songData.url).split(" "))
-        await this.streamResource(songData.url)
-        :
-        ytdl("https://www.youtube.com/watch?v=" + songData.videoId, {
-          filter: "audioonly",
-          quality: "highestaudio",
-          liveBuffer: 5000,
-          highWaterMark: 1024 * 1024 * 10, // 10mb
-          requestOptions: {
-            headers: {
-              "Cookie": "ID=" + new Date().getTime(),
-              //"x-youtube-identity-token": this.YT_API_KEY
+
+    let stream;
+    if (songData.type == "soundcloud") {
+      let ytdlpPath = (typeof this.ytdlp === "string") ? this.ytdlp : (this.ytdlp?.binaryPath || "yt-dlp");
+      const proc = spawn(ytdlpPath, ["-f", "bestaudio/best", "--no-playlist", "-o", "-", "--quiet", songData.url]);
+      stream = proc.stdout;
+    } else if (songData.type == "external" || songData.type == "radio") {
+      stream = await this.streamResource(songData.url);
+    } else {
+      const videoId = songData.videoId || (songData.url && (
+        (songData.url.match(/[?&]v=([^&]{11})/) || [])[1] ||
+        (songData.url.match(/youtu\.be\/([^?]{11})/) || [])[1]
+      ));
+
+      if (this.ytdlp) {
+        console.log("[Player] Attempting yt-dlp for:", videoId);
+        let ytdlpPath = (typeof this.ytdlp === "string") ? this.ytdlp : (this.ytdlp.binaryPath || "yt-dlp");
+
+        const proc = spawn(ytdlpPath, [
+          "--cookies", "/root/revolt/cookies.txt",
+          "--js-runtimes", "node",
+          "-f", "251/250/249/bestaudio",
+          "--no-playlist", "-o", "-", "--quiet", "--no-cache-dir", "--force-ipv4",
+          "https://www.youtube.com/watch?v=" + videoId
+        ]);
+
+        const passThrough = new PassThrough();
+        stream = passThrough;
+        proc.stdout.pipe(passThrough);
+
+        proc.stderr.on("data", async (d) => {
+          const msg = d.toString();
+          if (msg.includes("Sign in") || msg.includes("confirm you’re not a bot")) {
+            console.warn("[Player] yt-dlp blocked. Switching to youtubei.js...");
+            const fallback = await this.getYoutubeiStream(videoId);
+            if (fallback) {
+              proc.kill();
+              connection.media.playStream(fallback);
             }
           }
-        }, { highWaterMark: 1048576 / 4 });
+        });
+      } else {
+        stream = await this.getYoutubeiStream(videoId);
+      }
+    }
+
+    if (!stream) { this.emit("stopplay"); return false; }
+
     connection.media.once("startplay", () => this.emit("streamStartPlay"));
     connection.media.playStream(stream);
     stream.once("data", () => this.startedPlaying = Date.now());
@@ -384,12 +501,13 @@ class RevoltPlayer extends EventEmitter {
 
     try {
       if (this.connection.state !== Revoice.State.OFFLINE) {
+        const channelKey = this.connection.channelId;
         this.connection.state = Revoice.State.OFFLINE;
         this.leaving = true;
         this.connection.leave();
-        this.voice.connections.delete(this.connection.channelId);
-        this.data.current = null;
-        this.data.queue = [];
+        this.voice.connections.delete(channelKey);
+        // Clear only this channel's data, leaving other channels untouched
+        this._channelData.delete(channelKey);
       }
     } catch (error) {
       return false;
@@ -401,12 +519,20 @@ class RevoltPlayer extends EventEmitter {
   destroy() {
     return this.connection.destroy();
   }
-  fetchResults(query, id, provider="yt") { // TODO: implement pagination of further results
+  fetchResults(query, id, provider = "yt") { // TODO: implement pagination of further results
+    const providerNames = {
+      yt: "YouTube",
+      ytm: "YouTube Music",
+      scld: "SoundCloud",
+    };
     return new Promise(res => {
-      let list = `Search results using **${(provider == "yt") ? "Youtube" : "YoutubeMusic"}**:\n\n`;
-      this.workerJob("searchResults", { query: query, provider: provider, resultCount: this.resultLimit }, () => {}).then((data) => {
+      let list = `Search results using **${providerNames[provider] || "YouTube"}**:\n\n`;
+      this.workerJob("searchResults", { query: query, provider: provider, resultCount: this.resultLimit }, () => { }).then((data) => {
         data.data.forEach((v, i) => {
-          list += `${i + 1}. [${v.title}](${v.url}) - ${this.getDuration(v.duration)}\n`;
+          const url = v.url || v.permalink_url || "";
+          const title = v.title || v.name || "Unknown";
+          const dur = v.duration ? this.getDuration(v.duration) : "?:??";
+          list += `${i + 1}. [${title}](${url}) - ${dur}\n`;
         });
         list += "\nSend the number of the result you'd like to play here in this channel. Example: `2`\nTo cancel this process, just send an 'x'!";
         this.searches.set(id, data.data);
@@ -414,7 +540,7 @@ class RevoltPlayer extends EventEmitter {
       });
     });
   }
-  playResult(id, result=0, next=false) {
+  playResult(id, result = 0, next = false) {
     if (!this.searches.has(id)) return null;
     const res = this.searches.get(id)[result];
 
@@ -430,26 +556,26 @@ class RevoltPlayer extends EventEmitter {
       console.log("channel: ", channel)
       this.voice.join(channel, this.LEAVE_TIMEOUT).then((connection) => {
         //console.log(connection);
-				this.connection = connection;
-				connection.once("join", res);
+        this.connection = connection;
+        connection.once("join", res);
         var roomFetched = false;
-				connection.on("roomfetched", () => { if (roomFetched) return; roomFetched = true; this.emit("roomfetched", connection.users) });
-				this.connection.on("state", (state) => {
+        connection.on("roomfetched", () => { if (roomFetched) return; roomFetched = true; this.emit("roomfetched", connection.users) });
+        this.connection.on("state", (state) => {
           console.log(state);
           if (state == Revoice.State.IDLE && !roomFetched) {
             this.emit("roomfetched", connection.users)
           }
-					this.state = state;
-					if (state == Revoice.State.OFFLINE && !this.leaving) {
-						this.emit("autoleave");
-						return;
-					}
-					if (state == Revoice.State.IDLE) this.playNext();
-				});
+          this.state = state;
+          if (state == Revoice.State.OFFLINE && !this.leaving) {
+            this.emit("autoleave");
+            return;
+          }
+          if (state == Revoice.State.IDLE) this.playNext();
+        });
       });
     })
   }
-  playRadio(radio, top=false) {
+  playRadio(radio, top = false) {
     let prep = this.preparePlay();
     if (prep) return prep;
 
@@ -484,7 +610,7 @@ class RevoltPlayer extends EventEmitter {
   playFirst(query, provider) {
     return this.play(query, true, provider);
   }
-  play(query, top=false, provider) { // top: where to add the results in the queue (top/bottom)
+  play(query, top = false, provider) { // top: where to add the results in the queue (top/bottom)
     let prep = this.preparePlay();
     if (prep) return prep;
 
