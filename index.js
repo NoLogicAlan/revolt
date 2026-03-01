@@ -24,8 +24,6 @@ class Remix {
   constructor() {
     this.client = new Client({
       ...config["revolt.js"],
-      autoReconnect: true,
-      api_url: "https://api.stoat.chat/0.8",
       heartbeatInterval: 45000
     });
     this.client.config = config;
