@@ -4,6 +4,7 @@ const { Worker } = require('worker_threads');
 const { Innertube, Platform } = require("youtubei.js"); // replaces ytdl-core
 const { PassThrough } = require("stream");
 const { spawn } = require("child_process");
+const meta = require("./src/probe.js");
 const fs = require('fs');
 
 // Tell youtubei.js how to evaluate YouTube's obfuscated JS for URL deciphering.
@@ -163,6 +164,7 @@ class RevoltPlayer extends EventEmitter {
     return this.data.queue.unshift(data);
   }
   prettifyMS(milliseconds) {
+    if (!milliseconds || isNaN(milliseconds) || milliseconds < 0) return "0:00";
     return new Date(milliseconds).toISOString().slice(
       // if 1 hour passed, show the hour component,
       // if 1 hour hasn't passed, don't show the hour component
@@ -226,8 +228,8 @@ class RevoltPlayer extends EventEmitter {
       if (code) return vid.title + " - " + vid.url;
       return "[" + vid.title + "](" + vid.url + ")";
     }
-    if (code) return vid.title + " (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(vid.duration) + ")" + ((vid.url) ? " - " + vid.url : "");
-    return "[" + vid.title + " (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(vid.duration) + ")" + "]" + ((vid.url) ? "(" + vid.url + ")" : "");
+    if (code) return vid.title + " (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(vid.duration) + ")" + ((vid.spotifyUrl || vid.url) ? " - " + (vid.spotifyUrl || vid.url) : "");
+    return "[" + vid.title + " (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(vid.duration) + ")" + "]" + ((vid.spotifyUrl || vid.url) ? "(" + (vid.spotifyUrl || vid.url) + ")" : "");
   }
   msgChunking(msg) {
     let msgs = [[""]];
@@ -329,7 +331,7 @@ class RevoltPlayer extends EventEmitter {
     if (this.data.current.type === "external") {
       return { msg: "Playing **[" + this.data.current.title + "](" + this.data.current.url + ") by [" + this.data.current.artist + "](" + this.data.current.author.url + ")** \n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() }
     }
-    return { msg: "Playing: **[" + this.data.current.title + "](" + this.data.current.url + ")** (" + this.getCurrentElapsedDuration() + "/" + this.getCurrentDuration() + ")" + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() };
+    return { msg: "Playing: **[" + this.data.current.title + "](" + (this.data.current.spotifyUrl || this.data.current.url) + ")** (" + this.getCurrentElapsedDuration() + "/" + this.getCurrentDuration() + ")" + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() };
   }
   uploadThumbnail() {
     return new Promise((res) => {
@@ -363,12 +365,13 @@ class RevoltPlayer extends EventEmitter {
     return "Volume changed to `" + (v * 100) + "%`.";
   }
   announceSong(s) {
+    if (!s) return;
     if (s.type === "radio") {
       this.emit("message", "Now streaming _" + s.title + "_ by [" + s.author.name + "](" + s.author.url + ")");
       return;
     }
     var author = (!s.artists) ? "[" + s.author.name + "](" + s.author.url + ")" : s.artists.map(a => `[${a.name}](${a.url})`).join(" & ");
-    this.emit("message", "Now playing [" + s.title + "](" + s.url + ") by " + author);
+    this.emit("message", "Now playing [" + s.title + "](" + (s.spotifyUrl || s.url) + ") by " + author);
   }
 
   // functional core

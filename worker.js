@@ -59,19 +59,14 @@ class YTUtils extends EventEmitter {
     this.emit("error", data);
   }
   prettifyTimestamp(ms) {
-    let mins = Math.floor(ms / 1000 / 60);
-    let secs = Math.floor(60 * ((ms / 1000 / 60) - mins));
-    let p = (n) => {
-      if (("" + n).length > 1) return "" + n;
-      return "0" + n;
-    }
-    let f = (t, curr = []) => {
-      if (t < 60) { curr.push(p(t)); return curr.join(":"); }
-      let nt = Math.floor(t / 60);
-      curr.push(p(nt));
-      return f(nt, curr);
-    };
-    return f(mins) + ":" + p(secs);
+    const totalSecs = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    const p = (n) => String(n).padStart(2, "0");
+    return hours > 0
+      ? `${hours}:${p(mins)}:${p(secs)}`
+      : `${mins}:${p(secs)}`;
   }
 
   youtubeParser(url) {
@@ -126,7 +121,7 @@ class YTUtils extends EventEmitter {
           r.thumbnail = (Array.from(result.thumbnails).sort((a, b) => b.width - a.width)[0] || {}).url;
           r.artists = ((Array.isArray(result.artist)) ? Array.from(result.artist) : [result.artist])
             .map(a => (a.url = `https://music.youtube.com/channel/${a.browseId}`, a));
-          r.duration = { timestamp: this.prettifyTimestamp((result.duration || 0) * 1000), seconds: result.duration || 0 };
+          r.duration = { timestamp: this.prettifyTimestamp(result.duration || 0), seconds: Math.floor((result.duration || 0) / 1000) };
           return r;
         });
       }
@@ -203,14 +198,15 @@ class YTUtils extends EventEmitter {
       const album = await ((type == "album") ? this.spotify.getAlbum : this.spotify.getPlaylist)("https://open.spotify.com/" + type + "/" + id);
       var load = (trackId) => {
         return new Promise(async res => {
-          const track = await this.spotify.getTrack("https://open.spotify.com/track/" + trackId);
-          res(await this.getByQuerySpotify(track.name + " " + track.artists[0]));
+          const spotifyTrackUrl = "https://open.spotify.com/track/" + trackId;
+          const track = await this.spotify.getTrack(spotifyTrackUrl);
+          res(await this.getByQuerySpotify(track.name + " " + track.artists[0], spotifyTrackUrl));
         });
       };
       Promise.allSettled(album.tracks.map(a => load(a))).then((d) => {
-        d = d.map(e => e.value);
+        d = d.map(e => e.value).filter(e => e && e.type === "video" && e.data);
         this.emit("message", "Successfully added " + d.length + " songs to the queue.");
-        res({ type: "list", data: d });
+        res({ type: "list", data: d.map(e => e.data) });
       });
     });
   }
@@ -219,10 +215,11 @@ class YTUtils extends EventEmitter {
   }
   async getBySpotifyId(id) {
     this.emit("message", "Loading Spotify track...");
-    let song = await this.spotify.getTrack("https://open.spotify.com/track/" + id);
+    const spotifyTrackUrl = "https://open.spotify.com/track/" + id;
+    let song = await this.spotify.getTrack(spotifyTrackUrl);
     this.emit("message", "Resolving Spotify track...");
     // Search on YTM for best match (better for music tracks)
-    return await this.getByQueryYTM(song.name + " " + song.artists[0]);
+    return await this.getByQuerySpotify(song.name + " " + song.artists[0], spotifyTrackUrl);
   }
 
   async fetchPlaylist(id) {
@@ -290,8 +287,8 @@ class YTUtils extends EventEmitter {
   }
 
   /** Search YouTube Music and return first result */
-  async getByQueryYTM(query) {
-    this.emit("message", "Searching YouTube Music...");
+  async getByQueryYTM(query, silent = false) {
+    if (!silent) this.emit("message", "Searching YouTube Music...");
     await this.init();
     const results = (await this.api.search(query, "song")).content;
     const song = results[0];
@@ -305,14 +302,14 @@ class YTUtils extends EventEmitter {
     r.thumbnail = (Array.from(song.thumbnails).sort((a, b) => b.width - a.width)[0] || {}).url;
     r.artists = ((Array.isArray(song.artist)) ? Array.from(song.artist) : [song.artist])
       .map(a => (a.url = `https://music.youtube.com/channel/${a.browseId}`, a));
-    r.duration = { timestamp: this.prettifyTimestamp((song.duration || 0) * 1000), seconds: song.duration || 0 };
+    r.duration = { timestamp: this.prettifyTimestamp(song.duration || 0), seconds: Math.floor((song.duration || 0) / 1000) };
     this.emit("message", `Successfully added [${r.title}](${r.url}) to the queue.`);
     return { type: "video", data: r };
   }
 
   /** Search YouTube and return first result — used as text-search fallback */
-  async getByQueryYT(query) {
-    this.emit("message", "Searching YouTube...");
+  async getByQueryYT(query, silent = false) {
+    if (!silent) this.emit("message", "Searching YouTube...");
     const video = (await yts(query)).videos[0];
     if (!video) {
       this.emit("message", "**No YouTube result found for '" + query + "'!**");
@@ -335,10 +332,16 @@ class YTUtils extends EventEmitter {
   }
 
   /** Spotify-resolved search: tries YTM first, falls back to YT */
-  async getByQuerySpotify(query) {
-    const r = await this.getByQueryYTM(query);
-    if (r) return r;
-    return await this.getByQueryYT(query);
+  async getByQuerySpotify(query, spotifyUrl) {
+    this.emit("message", "Searching Spotify...");
+    const r = await this.getByQueryYTM(query, true);
+    if (r) {
+      if (spotifyUrl) r.data.spotifyUrl = spotifyUrl;
+      return r;
+    }
+    const fallback = await this.getByQueryYT(query, true);
+    if (fallback && spotifyUrl) fallback.data.spotifyUrl = spotifyUrl;
+    return fallback;
   }
 
   isMedia(url) {
