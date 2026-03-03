@@ -823,7 +823,7 @@ class CommandHandler extends EventEmitter {
     // TODO: add titles to embeds
     let content = "# " + this.capitalize(cmd.name) + "\n";
     content += this.getDescription(cmd, msg) + "\n\n";
-    content += "#### Usage: \n🖥️ `" + this.genCmdUsage(cmd, msg, "` `") + "`\n\n";
+    content += "#### Usage: \n💻 `" + this.genCmdUsage(cmd, msg, "` `") + "`\n\n";
     if (cmd.examples.length > 0) content += "Example(s): \n- `" + cmd.examples.map(e => this.f(e, msg?.channel?.serverId)).join("`\n- `") + "`\n\n";
     if (cmd.aliases.length > 1) {
       content += "#### Aliases: \n";

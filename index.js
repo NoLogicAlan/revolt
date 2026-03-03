@@ -271,7 +271,7 @@ class Remix {
       this.comHashLong = null;
     }
 
-    this.comLink = (this.comHashLong) ? "https://github.com/remix-bot/revolt/tree/" + this.comHashLong : "https://github.com/remix-bot/revolt";
+    this.comLink = (this.comHashLong) ? "https://github.com/remix-bot/stoat/tree/" + this.comHashLong : "https://github.com/remix-bot/stoat";
     this.playerMap = new Map();
     this.currPort = -1;
     this.channels = [];
@@ -436,7 +436,7 @@ class Remix {
         const channels = msg.channel.server.channels.filter(c => c.isVoice);
         if (channels.length != 0) { // TODO: translate
           var channelSelection = "Please select one of the following channels by clicking on the reactions below\n\n";
-          var reactions = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];//[":one:",":two:",":three:",":four:",":five:",":six:",":seven:",":eight:",":nine:"];
+          var reactions = ["🥇", "🥈", "🥉", "🥇", "🥈", "🥉", "🥇", "🥈", "🥉",];//[":one:",":two:",":three:",":four:",":five:",":six:",":seven:",":eight:",":nine:"];
           channels.slice(0, 9).forEach((c, i) => {
             channelSelection += (i + 1) + ". <#" + c.id + ">\n";
           });
@@ -592,7 +592,11 @@ class Remix {
       }).catch(() => { });
       return message.reply({ content: " ", embeds: [this.embedify("I need reaction permissions to work. Please contact a server administrator to address this.")] }, true);
     }
+<<<<<<< chore/update-caching-config
     const arrows = ["⬅️", "➡️"];
+=======
+    const arrows = [ "👈", "👉" ];
+>>>>>>> main
     var page = 0;
     const paginated = this.pages(content, maxLinesPerPage);
     form = form.replace(/\$maxPage/gi, paginated.length);
@@ -656,7 +660,7 @@ class Remix {
     const forms = categories.map(c => c.form);
     const titles = categories.map(c => c.title);
 
-    const arrows = ["⬅️", "➡️"];
+    const arrows = ["👈", "👉"];
     const rs = [...reactions, ...arrows];
     var currPage = 0;
     var currCat = defaultPage;
@@ -730,17 +734,13 @@ class Remix {
       form: `# Music\n\n$content\n\nTo learn more about a command, run \`${pref}help <command name>\`!\n\nTip: You can use the arrows beneath this message to turn pages, or use \`${pref}help <page number>\` to access a certain page.\n\n###### Page $currPage/$maxPage`,
       title: "Music Commands"
     }, { // TODO: add more info here
-      reaction: "ℹ️",
+      reaction: "📝",
       content: commands.util,
       form: `# Utilities\n\n$content\n\nTo learn more about a command, run \`${pref}help <command name>\`!\n\nTip: You can use the arrows beneath this message to turn pages, or use \`${pref}help <page number>\` to access a certain page.\n\n###### Page $currPage/$maxPage`,
       title: "Utility Commands"
     }, {
       reaction: "💻",
-      content: [`If you need help with anything or encounter any issues, hop over to our support server [Remix HQ](/invite/Remix)!\n
-      Alternatively, you can write a dm to any of the following people:
-      - <@01FZ5P08W36B05M18FP3HF4PT1> (Community Manager & Developer)
-      - <@01G9MCW5KZFKT2CRAD3G3B9JN5> (Lead Developer)
-      - <@01FVB1ZGCPS8TJ4PD4P7NAFDZA> (Junior Developer)`],
+      content: ["If you need help with anything or encounter any issues, hop over to our support server [Remix HQ](https://stt.gg/Remix)!\nAlternatively, you can write a dm to any of the following people:\n\n- <@01FZ5P08W36B05M18FP3HF4PT1> (Community Manager)\n- <@01G9MCW5KZFKT2CRAD3G3B9JN5> (Lead Developer)\n- <@01FVB1ZGCPS8TJ4PD4P7NAFDZA> (Junior Developer)"],
       form: "# Support\n\n$content\n\n###### Page $currPage/$maxPage",
       title: "Support Info"
     }]; // TODO: add status, or news page
