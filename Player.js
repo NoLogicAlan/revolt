@@ -418,7 +418,7 @@ class RevoltPlayer extends EventEmitter {
         proc.stderr.on("data", async (d) => {
           if (ytdlpFallbackTriggered) return;
           const msg = d.toString();
-          // Broad match — catches any auth/block variant YouTube may send
+          // catches any auth/block variant YouTube may send
           const isBlocked = (
             msg.includes("Sign in") ||
             msg.includes("bot") ||
@@ -445,12 +445,12 @@ class RevoltPlayer extends EventEmitter {
           }
         });
 
-        // Safety net: yt-dlp exits non-zero but stderr didn't match any known pattern
+        // yt-dlp exits non-zero but stderr didn't match any known pattern
         proc.on("close", async (code) => {
           if (ytdlpFallbackTriggered) return;
           if (code !== 0 && !passThrough.destroyed) {
             ytdlpFallbackTriggered = true;
-            console.warn("[Player] yt-dlp exited with code", code, "— falling back to youtubei.js...");
+            console.warn("[Player] yt-dlp exited with code", code, " falling back to youtubei.js...");
             const fallback = await this.getYoutubeiStream(videoId);
             if (fallback) {
               fallback.pipe(passThrough);
