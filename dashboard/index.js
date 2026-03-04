@@ -662,3 +662,4 @@ class Dashboard {
 }
 
 module.exports = Dashboard;
+
