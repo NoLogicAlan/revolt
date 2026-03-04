@@ -8,9 +8,6 @@ const YoutubeMusicApi = require("youtube-music-api-fix");
 const meta = require("./src/probe.js");
 const { Innertube, Platform } = require("youtubei.js");
 
-// If no workerData was passed (running directly for testing), default to dev.
-workerData ||= { jobId: "dev", data: {} };
-
 // Tell youtubei.js how to evaluate YouTube's obfuscated JS for URL deciphering.
 Platform.shim.eval = async (data, env) => {
   const properties = [];
@@ -20,18 +17,6 @@ Platform.shim.eval = async (data, env) => {
   return new Function(code)();
 };
 
-// Shared Innertube instance (one per worker process)
-let _innertube = null;
-async function getInnertube() {
-  if (!_innertube) {
-    _innertube = await Innertube.create({
-      retrieve_player: true,
-      generate_session_locally: true,
-    });
-  }
-  return _innertube;
-}
-
 class YTUtils extends EventEmitter {
   constructor(spotify) {
     super();
@@ -40,6 +25,7 @@ class YTUtils extends EventEmitter {
     this.spotifyConfig = spotify;
     this.ytApi = null;
     this.scld = new Soundcloud();
+    this._innertube = null;
 
     return this;
   }
@@ -54,6 +40,14 @@ class YTUtils extends EventEmitter {
   init() {
     if (Object.keys(this.api.ytcfg).length > 0) return true;
     return this.api.initalize();
+  }
+  async innertube() {
+    if (this._innertube) return this._innertube;
+    this._innertube = Innertube.create({
+      retrieve_player: true,
+      generate_session_locally: true,
+    });
+    return this._innertube
   }
   error(data) {
     this.emit("error", data);
@@ -251,7 +245,7 @@ class YTUtils extends EventEmitter {
     this.emit("message", "Loading video data...");
     let video;
     try {
-      const innertube = await getInnertube();
+      const innertube = await this.innertube();
       const info = await innertube.getBasicInfo(parsedId, "WEB");
       const d = info.basic_info;
       video = {
@@ -286,7 +280,7 @@ class YTUtils extends EventEmitter {
     return { type: "video", data: video };
   }
 
-  /** Search YouTube Music and return first result */
+  // Search YouTube Music and return first result
   async getByQueryYTM(query, silent = false) {
     if (!silent) this.emit("message", "Searching YouTube Music...");
     await this.init();
@@ -307,7 +301,7 @@ class YTUtils extends EventEmitter {
     return { type: "video", data: r };
   }
 
-  /** Search YouTube and return first result — used as text-search fallback */
+  // Search YouTube and return first result — used as text-search fallback
   async getByQueryYT(query, silent = false) {
     if (!silent) this.emit("message", "Searching YouTube...");
     const video = (await yts(query)).videos[0];
@@ -319,7 +313,7 @@ class YTUtils extends EventEmitter {
     return { type: "video", data: video };
   }
 
-  /** Search SoundCloud text and return first result */
+  // Search SoundCloud text and return first result
   async getByQuerySC(query) {
     this.emit("message", "Searching SoundCloud...");
     const song = await this.getSoundCloudResult(query);
@@ -331,7 +325,7 @@ class YTUtils extends EventEmitter {
     return { type: "video", data: song };
   }
 
-  /** Spotify-resolved search: tries YTM first, falls back to YT */
+  // Spotify-resolved search: tries YTM first, falls back to YT
   async getByQuerySpotify(query, spotifyUrl) {
     this.emit("message", "Searching Spotify...");
     const r = await this.getByQueryYTM(query, true);
@@ -369,7 +363,6 @@ class YTUtils extends EventEmitter {
   }
 
   async getVideoData(query, provider = "yt") {
-    // ── Direct link handlers (provider is ignored for links) ──
     if (this.isSpotify(query))    return await this.getSpotifyData(query);
     if (this.isSoundCloud(query)) return await this.getScdl(query);
 
@@ -394,7 +387,6 @@ class YTUtils extends EventEmitter {
       if (await this.isMedia(query)) return await this.unknownMedia(query);
     }
 
-    // ── Text search — use provider ──
     switch (provider) {
       case "ytm":  return await this.getByQueryYTM(query);
       case "scld": return await this.getByQuerySC(query);
@@ -405,7 +397,7 @@ class YTUtils extends EventEmitter {
   async search(string, id) {
     if (id) {
       try {
-        const innertube = await getInnertube();
+        const innertube = await this.innertube();
         const info = await innertube.getBasicInfo(string, "WEB");
         const d = info.basic_info;
         return {
@@ -444,7 +436,6 @@ const post = (event, data) => {
 
 (async () => {
   if (jobId === "dev") {
-    // Quick test
     console.log(await utils.getVideoData("Neoni funeral", "ytm"));
     return;
   }
