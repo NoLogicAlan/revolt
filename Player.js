@@ -61,20 +61,16 @@ async function getInnertube() {
 class RevoltPlayer extends EventEmitter {
   constructor(token, opts) {
     super();
+
     this.voice = opts.voice || new Revoice(token, undefined, opts.client);
     this.connection = { state: Revoice.State.OFFLINE };
+
     this.upload = opts.uploader || new Uploader(opts.client, true);
+
     this.spotify = opts.spotifyClient || new Spotify(opts.spotify);
     this.spotifyConfig = opts.spotify;
-    this.ytdlp = opts.ytdlp;
 
-    if (this.ytdlp && typeof this.ytdlp.binaryPath === "string") {
-      const { execFile } = require("child_process");
-      execFile(this.ytdlp.binaryPath, ["-U"], (err, stdout, stderr) => {
-        if (err) console.warn("[Player] yt-dlp update check failed:", err.message);
-        else console.log("[Player] yt-dlp update:", (stdout || stderr || "up to date").split("\n")[0]);
-      });
-    }
+    this.ytdlp = opts.ytdlp;
 
     this.gClient = opts.geniusClient || new (require("genius-lyrics")).Client();
     this.port = 3050 + (opts.portOffset || 0);

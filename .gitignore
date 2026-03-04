@@ -9,3 +9,5 @@ bin/
 test_data/
 *.code-workspace
 *old.js
+.ytcache/
+.yt_auth.json
