@@ -1,63 +1,11 @@
 const EventEmitter = require("events");
 const { Revoice, MediaPlayer } = require("revoice.js");
 const { Worker } = require('worker_threads');
-const { Innertube, Platform } = require("youtubei.js"); // replaces ytdl-core
 const { PassThrough } = require("stream");
 const { spawn } = require("child_process");
 const meta = require("./src/probe.js");
 const fs = require('fs');
 
-// Tell youtubei.js how to evaluate YouTube's obfuscated JS for URL deciphering.
-// Uses Node's built-in Function constructor — no extra packages needed.
-Platform.shim.eval = async (data, env) => {
-  const properties = [];
-  if (env.n) properties.push(`n: exportedVars.nFunction("${env.n}")`);
-  if (env.sig) properties.push(`sig: exportedVars.sigFunction("${env.sig}")`);
-  const code = `${data.output}\nreturn { ${properties.join(', ')} }`;
-  return new Function(code)();
-};
-
-// Shared Innertube instance
-let _innertube = null;
-async function getInnertube() {
-  if (!_innertube) {
-    _innertube = await Innertube.create({
-      retrieve_player: true,
-      generate_session_locally: true,
-      // Using Firefox User Agent
-      user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
-      client_type: 'WEB',
-      // Visitor data helps stabilize the v1/player 400 errors
-      visitor_data: 'CgtSdl9RSl9uX3dfdyiAgpWyBg%3D%3D'
-    });
-
-    _innertube.session.on('auth-pending', (data) => {
-      console.log(`\n[!] YOUTUBE LOGIN: Go to ${data.verification_url} and enter: ${data.user_code}\n`);
-    });
-
-    _innertube.session.on('auth', (data) => {
-      console.log('[Player] youtubei.js successfully authenticated.');
-      fs.writeFileSync('./yt_auth.json', JSON.stringify(data.credentials));
-    });
-
-    _innertube.session.on('update-credentials', (data) => {
-      fs.writeFileSync('./yt_auth.json', JSON.stringify(data.credentials));
-    });
-
-    if (fs.existsSync('./yt_auth.json')) {
-      const creds = JSON.parse(fs.readFileSync('./yt_auth.json'));
-      try {
-        await _innertube.session.signIn(creds);
-      } catch (e) {
-        console.error("[Player] Session expired, re-authenticating...");
-        await _innertube.session.signIn();
-      }
-    } else {
-      await _innertube.session.signIn();
-    }
-  }
-  return _innertube;
-}
 class RevoltPlayer extends EventEmitter {
   constructor(token, opts) {
     super();
@@ -71,6 +19,7 @@ class RevoltPlayer extends EventEmitter {
     this.spotifyConfig = opts.spotify;
 
     this.ytdlp = opts.ytdlp;
+    this.innertube = opts.innertube;
 
     this.gClient = opts.geniusClient || new (require("genius-lyrics")).Client();
     this.port = 3050 + (opts.portOffset || 0);
@@ -375,7 +324,7 @@ class RevoltPlayer extends EventEmitter {
 
   async getYoutubeiStream(videoId) {
     try {
-      const innertube = await getInnertube();
+      const innertube = this.innertube;
       // Try TV and ANDROID clients as they have less strict PoToken requirements currently
       const clients = ["TV", "ANDROID", "YTMUSIC", "WEB"];
       let webStream = null;
