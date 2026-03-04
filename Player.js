@@ -32,7 +32,7 @@ class RevoltPlayer extends EventEmitter {
     this.resultLimit = 5;
     this.startedPlaying = null;
     this.searches = new Map();
-    this.data = this.data = {
+    this.data = {
       queue: [],
       current: null,
       loop: false,
@@ -485,7 +485,12 @@ class RevoltPlayer extends EventEmitter {
         this.leaving = true;
         this.connection.leave();
         this.voice.connections.delete(channelKey);
-        this.data = null; // data should not e used after leaving, the Player object is invalidated.
+        this.data = {
+          queue: [],
+          current: null,
+          loop: false,
+          loopSong: false
+        }; // data should not be used after leaving, the Player object is invalidated.
       }
     } catch (error) {
       return false;
