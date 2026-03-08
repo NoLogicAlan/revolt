@@ -94,7 +94,7 @@ Please refer to the [stoat.js docs](https://stoat.js.org/classes/Client.html#con
 ## Updating YTDL-Core
 
 Remix uses ytdl-core to download the music from YouTube. Since the original js package receives updates rarely,
-we're using a more frequently updated/fixed fork by [DistubeJs](https://github.com/distubejs/ytdl-core).
+we're using a more frequently updated/fixed fork by [DisTube](https://github.com/distubejs/ytdl-core).
 That means if there are errors during playback, you can try to update ytdl using the following command:
 
 ```js
@@ -108,6 +108,7 @@ If you have any questions or would like to talk with other Remix users you can j
 ---
 
 &copy; 2026 Remix. All Rights Reserved.
+
 
 
 
