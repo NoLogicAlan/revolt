@@ -525,7 +525,7 @@ export class HelpHandler {
    */
   commandUsage(cmd, msg) {
     if (cmd.subcommands.length > 0) {
-      return cmd.command + " <" + cmd.subcommands.map(e => e.name).join(" | ") + "> [...]".trim();
+      return this.commands.format("$prefix" + cmd.command, msg.message.server.id) + " <" + cmd.subcommands.map(e => e.name).join(" | ") + "> [...]".trim();
     }
     let options = this.commands.format("$prefix" + cmd.command, msg.message.server.id);
     cmd.options.forEach(o => {
@@ -558,7 +558,7 @@ export class HelpHandler {
     if (command.subcommands.length > 0) {
       content += "#### Subcommands: \n";
       command.subcommands.forEach(s => {
-        content += "- " + s.name + ": " + this.commandDescription(s, msg).split("\n")[0] + ((s.options.length > 0) ? "; (`" + s.options.length + " option(s)`)" : "") + "\n";
+        content += "- " + s.name + ": " + (this.commandDescription(s, msg) || "").split("\n")[0] + ((s.options.length > 0) ? "; (`" + s.options.length + " option(s)`)" : "") + "\n";
       });
       content += "\n";
     } else if (command.options.length > 0) {
@@ -701,6 +701,19 @@ export class CommandHandler extends EventEmitter {
         if (idx === -1) return this.replyHandler("Unknown command `$prefix" + args[1] + "`!", msg);
         return this.replyHandler(this.helpHandler.getCommandHelp(this.commands[idx], msg), msg);
       }
+      // args.length > 2 --> subcommands/options requested
+      // TODO: support option help requests (help pages for options of commands)
+      let currCmd = null;
+      let prefix = "";
+      for (let i = 0; i < args.slice(1).length; i++) {
+        let a = args.slice(1)[i];
+        let curr = (currCmd) ? currCmd.subcommands : this.commands;
+        let idx = curr.findIndex(e => e.aliases.filter(al => al.toLowerCase() === a.toLowerCase()).length > 0);
+        if (idx === -1) return this.replyHandler("Unknown command `$prefix" + prefix + a + "`!", msg);
+        currCmd = curr[idx];
+        prefix += a + " ";
+      }
+      return this.replyHandler(this.helpHandler.getCommandHelp(currCmd, msg), msg);
     }
 
     if (!this.commandNames.includes(args[0].toLowerCase())) {

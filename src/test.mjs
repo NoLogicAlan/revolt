@@ -17,10 +17,13 @@ commands.setPrefixManager(new PrefixManager(settings));
 
 commands.addCommand(new CommandBuilder()
   .setName("test")
-  .addChannelOption((c) =>
-    c.setName("channel")
-      .setRequired(true)
-      .setType("voiceChannel")
+  .addSubcommand(s =>
+    s.setName("subcommand")
+      .addChannelOption((c) =>
+        c.setName("channel")
+          .setRequired(true)
+          .setType("voiceChannel")
+      )
   ));
 
 console.log(Utils.uid());
