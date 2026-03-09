@@ -544,13 +544,13 @@ export class HelpHandler {
    * @returns {string}
    */
   getCommandHelp(command, msg) {
-    let content = `# ${capitalise(command.name)}\n`;
+    let content = `# ${HelpHandler.capitalise(command.name)}\n`;
     content += this.commandDescription(command, msg) + "\n\n";
-    content += "#### Usage: \n💻 `" + this.commandUsage(command, msg)
+    content += "#### Usage: \n💻 `" + this.commandUsage(command, msg) + "`\n\n";
     if (command.examples.length > 0) content += "Example(s): \n- `" + command.examples.map(e => this.commands.format(e, msg.message.server.id)).join("`\n- `") + "`\n\n";
-    if (cmd.aliases.length > 1) {
+    if (command.aliases.length > 1) {
       content += "#### Aliases: \n";
-      cmd.aliases.forEach(alias => {
+      command.aliases.forEach(alias => {
         content += "- " + alias + "\n";
       });
       content += "\n";
@@ -561,7 +561,30 @@ export class HelpHandler {
         content += "- " + s.name + ": " + this.commandDescription(s, msg).split("\n")[0] + ((s.options.length > 0) ? "; (`" + s.options.length + " option(s)`)" : "") + "\n";
       });
       content += "\n";
-    } // TODO: continue from l. 841
+    } else if (command.options.length > 0) {
+      content += "#### Arguments: \n"; // TODO: IMPORTANT; visualise flags differently
+      command.options.forEach(o => {
+        /*const optional = ((o.required) ? "" : "; $\\color{gold}\\text{optional}$"); // TODO: create how-to-use page for help; explaining flags, optional arguments, etc
+        const flag = (o instanceof Flag) ? "$\\fbox{\\color{white}\\text{Flag:}}$ " : "";*/
+        const optional = ((o.required) ? "" : "?");
+        const flag = (o instanceof Flag) ? "-" : "";
+        if (o.type == "choice") {
+          content += "- **" + flag + o.name + "**" + optional + ": " + (o.description || "").split("\n")[0] + ";\n  - Allowed values: `" + o.choices.join("`, `") + "`\n  - Aliases: `" + o.aliases.join("`, `") + "`\n";
+        } else {
+          content += "- **" + flag + o.name + "**" + optional + ": " + (o.description || "").split("\n")[0] + "\n  - Aliases: `" + o.aliases.join("`, `") + "`\n";
+        }
+        content += "\n";
+      });
+      content += "\n";
+    }
+    if (command.requirements.length > 0) { // TODO: add requirement inheritance (displaying parent requirements on subcommand help page)
+      content += "#### Requirements: \n";
+      command.requirements.forEach(r => {
+        content += "- " + r.getPermissions().map(e => "Permission `" + e + "`").join("\n- ")
+      });
+    }
+
+    return content.trim();
   }
 }
 
@@ -676,7 +699,7 @@ export class CommandHandler extends EventEmitter {
       if (args.length <= 2) {
         let idx = this.commands.findIndex(e => e.aliases.filter(al => al.toLowerCase() === args[1].toLowerCase()).length > 0);
         if (idx === -1) return this.replyHandler("Unknown command `$prefix" + args[1] + "`!", msg);
-
+        return this.replyHandler(this.helpHandler.getCommandHelp(this.commands[idx], msg), msg);
       }
     }
 
