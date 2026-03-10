@@ -1,5 +1,8 @@
 const EventEmitter = require("events");
 const { Revoice, MediaPlayer } = require("revoice.js");
+const Spotify = require("spotifydl-core").default;
+const Genius = require("genius-lyrics");
+const Uploader = require("revolt-uploader");
 const { Worker } = require('worker_threads');
 const { PassThrough } = require("stream");
 const { spawn } = require("child_process");
