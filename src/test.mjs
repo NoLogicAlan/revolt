@@ -2,7 +2,7 @@ import { MessageHandler, PageBuilder } from "./MessageHandler.mjs";
 import { Client } from "revolt.js"
 import * as fs from "fs";
 import { Utils } from "./Utils.mjs";
-import { CommandBuilder, CommandHandler, PrefixManager } from "./CommandHandler.mjs";
+import { CommandBuilder, CommandHandler, HelpHandler, PrefixManager } from "./CommandHandler.mjs";
 import { MySqlSettingsManager } from "./Settings.mjs";
 
 const config = JSON.parse(fs.readFileSync("../config.json"));
@@ -10,6 +10,11 @@ const config = JSON.parse(fs.readFileSync("../config.json"));
 const client = new Client();
 const messages = new MessageHandler(client);
 const commands = new CommandHandler(messages);
+
+const helpHandler = new HelpHandler(commands);
+helpHandler.paginationHandler = null;
+helpHandler.commandsPerPage = 1;
+commands.setHelpHandler(helpHandler);
 
 const settings = new MySqlSettingsManager(config.mysql, "../storage/defaults.json");
 
@@ -24,7 +29,9 @@ commands.addCommand(new CommandBuilder()
           .setRequired(true)
           .setType("voiceChannel")
       )
-  ));
+));
+commands.addCommand(new CommandBuilder()
+  .setName("second"))
 
 console.log(Utils.uid());
 

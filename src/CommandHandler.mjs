@@ -1,6 +1,6 @@
 import { Utils } from "./Utils.mjs";
 import { EventEmitter } from "node:events";
-import { Message, MessageHandler } from "./MessageHandler.mjs";
+import { Message, MessageHandler, PageBuilder } from "./MessageHandler.mjs";
 import { Channel, Client, Message as StoatMessage, User } from "revolt.js";
 import { SettingsManager } from "./Settings.mjs";
 
@@ -497,6 +497,36 @@ export class PrefixManager {
 export class HelpHandler {
   /** @type {CommandHandler} */
   commands;
+  commandsPerPage = 5;
+
+  /**
+   * @param {Message} msg
+   * @param {HelpHandler} helpHandler
+   * @param {CommandBuilder[]} cmds
+   */
+  paginationHandler = (msg, helpHandler, cmds) => {
+    var form = "Available Commands (page $currentPage/$maxPage): \n\n$content";
+    form += "\n\nRun `$prefix$helpCmd <command>` to learn more about it. You can also include subcommands.\n";
+    form += "For example: `$prefix$helpCmd settings get`\n\n";
+    form += "Tip: Use the arrows beneath this message to turn pages, or specify the required page by using `$prefix$helpCmd <page number>`";
+
+    const contents = cmds.map((cmd, i) => {
+      return (i + 1) + ". **" + cmd.name + "**: " + (cmd.description || "").split("\n")[0];
+    });
+
+    const pages = new PageBuilder(contents)
+      .setForm(helpHandler.commands.format(form, msg.message.server.id))
+      .setMaxLines(helpHandler.commandsPerPage);
+
+    helpHandler.commands.messages.initPagination(pages, msg);
+    return null;
+  }
+
+  /**
+   * @abstract
+   * @param {Message} msg
+   */
+  customHelpHandler = null;
   constructor(commands) {
     this.commands = commands;
   }
@@ -508,6 +538,85 @@ export class HelpHandler {
     if (string.length < 1) return string;
     if (string.length === 1) return string.toUpperCase();
     return string.charAt(0).toUpperCase() + string.slice(1);
+  }
+
+  /**
+   * @param {CommandBuilder[]} [cmds]
+   * @returns {CommandBuilder[]}
+   */
+  userCommands(cmds) {
+    return (cmds || this.commands.commands).filter(c =>
+      c.requirements.findIndex(r =>
+        r.ownerOnly
+      ) === -1);
+  }
+
+  /**
+   * @returns {number}
+   */
+  pageNumber() {
+    // TODO: filter out owner-only commands
+    return Math.ceil(this.commands.commands.length / this.commandsPerPage);
+  }
+  /**
+   * @param {Message} message
+   */
+  help(message) {
+    if (this.customHelpHandler) return this.customHelpHandler(message);
+    if (this.paginationHandler) { // paginate if paginationHandler is set
+      return this.genHelp(null, message, true);
+    }
+    return this.getHelpPage(0, message);
+  }
+  /**
+   * @param {number} n zero-based index of the requested page
+   * @param {Message} msg
+   * @param {CommandBuilder[]} [cmds] The commands to generate the help page for
+   * @returns {string}
+   */
+  getHelpPage(n, msg, cmds = null) {
+    if (!cmds) cmds = this.commands.commands;
+    // TODO: filter out owner-only commands
+    if (!(this.commandsPerPage < cmds.length)) {
+      return this.genHelp(null, msg, false, cmds);
+    }
+    let offset = this.commandsPerPage * n;
+    const commands = cmds.slice(offset, offset + this.commandsPerPage);
+    let max = Math.ceil(cmds.length / this.commandsPerPage);
+
+    return this.genHelp({ curr: n + 1, max, offset }, msg, false, commands);
+  }
+  /**
+   *
+   * @param {Object|null} page
+   * @param {Message} msg
+   * @param {boolean} [paginate]
+   * @returns {string}
+   */
+  genHelp(page, msg, paginate = false, cmds = null) {
+    cmds = this.userCommands(cmds);
+
+    if (this.paginationHandler && msg && paginate) {
+      return this.paginationHandler(msg, this, cmds);
+    }
+
+    // if page is not set then all content fits on one page
+    let p = (page) ? ` (page ${page.curr}/${page.max})` : "";
+    const indexOffset = (page) ? page.offset : 0;
+
+    let content = "Available Commands" + p + ": \n\n";
+    if (page && page.curr != 1) content += (indexOffset) + ". [...]\n";
+
+    cmds.forEach((cmd, i) => {
+      content += (i + 1 + indexOffset) + ". **" + cmd.name + "**: " + cmd.description + "\n";
+    });
+    if (page && page.curr != page.max) content += (cmds.length + indexOffset) + ". [...]\n";
+
+    content += "\nRun `$prefix$helpCmd <command>` to learn more about it. You can also include subcommands.\n";
+    content += "For example: `$prefix$helpCmd command subcommandName`";
+    if (page) content += "\n\nTip: Turn pages by using `$prefix$helpCmd <page number>`"
+
+    return this.commands.format(content, msg.message.server.id);
   }
   /**
    *
@@ -651,6 +760,12 @@ export class CommandHandler extends EventEmitter {
   setPrefixManager(manager) {
     this.prefixes = manager;
   }
+  /**
+   * @param {HelpHandler} handler
+   */
+  setHelpHandler(handler) {
+    this.helpHandler = handler;
+  }
 
   /**
    * @param {string} text
@@ -688,12 +803,15 @@ export class CommandHandler extends EventEmitter {
       .map(e => e.trim())
 
     if (args[0] === this.helpCommand) {
-      // TODO: help command
       if (!args[1]) {
-        // TODO: custom help handling?
+        const res = this.helpHandler.help(msg);
+        return (typeof res === "string") ? this.replyHandler(res, msg) : undefined;
       }
-      if (args.length > 1) {
-        // TODO: native help pages
+
+      if (args.length > 1 && Utils.isNumber(args[1])) {
+        const pageNumber = parseInt(args[1]);
+        if (pageNumber < 1 || pageNumber > this.helpHandler.pageNumber()) return this.replyHandler("`" + newPage + "` is not a valid page number!", msg);
+        return this.replyHandler(this.helpHandler.getHelpPage(pageNumber - 1, msg), msg);
       }
 
       if (args.length <= 2) {
