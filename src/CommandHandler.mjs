@@ -1032,6 +1032,24 @@ export class CommandHandler extends EventEmitter {
     }
     return true;
   }
+  /**
+   * @param {string} type
+   * @param {string} i
+   * @param {Message} m
+   * @returns {boolean}
+   */
+  validateInput(type, i, m) {
+    return (new Option()).validateInput(i, this.client, m, type);
+  }
+  /**
+   * @param {string} type
+   * @param {string} i
+   * @param {Message} m
+   * @returns {string}
+   */
+  formatInput(type, i, m) {
+    return (new Option()).formatInput(i, this.client, m, type);
+  }
 
   addCommand(builder) {
     this.commandNames.push(...builder.aliases);
@@ -1085,7 +1103,7 @@ export class CommandLoader {
         return runFc.calls(this.context, data.message, data).catch(e => {
           const id = Utils.uid();
           console.log("Error running command; error id #" + id, e);
-          data.message.replyEmbed("An error occured. If this happens frequently, please contact ShadowLp174#0667 (<@01G9MCW5KZFKT2CRAD3G3B9JN5>)!\n\nError id: `#" + id + "`", true, { colour: red });
+          data.message.replyEmbed("An error occured. If this happens frequently, please contact ShadowLp174#0667 (<@01G9MCW5KZFKT2CRAD3G3B9JN5>)!\n\nError id: `#" + id + "`", true, { colour: "red" });
         });
       }
 
@@ -1094,7 +1112,7 @@ export class CommandLoader {
       } catch (e) {
         const id = Utils.uid();
         console.log("Error running command; error id #" + id, e);
-        data.message.replyEmbed("An error occured. If this happens frequently, please contact ShadowLp174#0667 (<@01G9MCW5KZFKT2CRAD3G3B9JN5>)!\n\nError id: `#" + id + "`", true, { colour: red });
+        data.message.replyEmbed("An error occured. If this happens frequently, please contact ShadowLp174#0667 (<@01G9MCW5KZFKT2CRAD3G3B9JN5>)!\n\nError id: `#" + id + "`", true, { colour: "red" });
       }
     });
   }

@@ -1,4 +1,6 @@
-import { Client, User, Message as StoatMessage, Channel as StoatChannel, ServerMember } from "revolt.js";
+import { Revoice } from "revoice.js";
+import { Client, User, Message as StoatMessage, Channel as StoatChannel, ServerMember, Server } from "revolt.js";
+import { Utils } from "./Utils.mjs";
 
 export class MessageHandler {
   /**
@@ -8,13 +10,35 @@ export class MessageHandler {
    */
   client;
   observedReactions;
+  /** @type {Map<string, string[]>} */
+  observedChannels;
+  /**
+   * @type {Revoice}
+   * @public
+   */
+  revoice;
+  LEAVE_TIMEOUT = 60 * 1000;
 
-  constructor(client) {
+  /**
+   * @param {Client} client
+   * @param {Revoice} revoice
+   */
+  constructor(client, revoice) {
     this.client = client;
+    this.revoice = revoice;
 
     this.observedReactions = new Map();
+    this.observedChannels = new Map();
 
     this.setupEvents();
+
+    this.client.on("messageCreate", (m) => {
+      if (!this.observedChannels.has(m.channel.id)) return;
+      const data = this.observedChannels.get(m.channel.id);
+      const d = data.filter(e => e.id === m.author.id);
+      if (d.length === 0) return;
+      d.forEach(e => e.cb(new Message(m, this)));
+    });
   }
   setupEvents() {
     const reactionUpdate = (message, user, emoji) => {
@@ -141,6 +165,32 @@ export class MessageHandler {
   }
   unobserveReactions(i) {
     return this.observedReactions.delete(i);
+  }
+  /**
+   * @param {string} user
+   * @param {StoatChannel} channel
+   * @param {MessageListener} callback
+   * @returns {string}
+   */
+  observeUserMessagesChannel(user, channel, callback) {
+    const current = (this.observedChannels.get(channel.id) || []);
+    const nonce = Utils.uid();
+    current.push({
+      id: user,
+      nonce: nonce,
+      cb: callback
+    });
+    this.observedChannels.set(channel.id, current);
+    return user + ";" + channel.id + ";" + nonce;
+  }
+  unobserveUserMessagesChannel(oid) {
+    const [user, channelId, nonce] = oid.split(";");
+    const current = (this.observedChannels.get(channelId) || []);
+    const idx = current.findIndex(e => e.id === user && e.nonce === nonce);
+    if (idx === -1) return;
+    current.splice(idx);
+    if (current.length === 0) return this.observedChannels.delete(channelId);
+    this.observedChannels.set(current, current);
   }
 
   #masquerade(channel) {
@@ -397,6 +447,19 @@ export class MessageHandler {
       };
     }
   }
+
+  /**
+   * @typedef {Object} VoiceConnection
+   * @description Placeholder as it is not exported by revoice
+   */
+
+  /**
+   * @param {string} channel ChannelId of the channel to join
+   * @returns {Promise<VoiceConnection>}
+   */
+  async joinChannel(channel) {
+    return await this.revoice.join(channel, this.LEAVE_TIMEOUT);
+  }
 }
 
 export class Channel {
@@ -409,7 +472,7 @@ export class Channel {
   handler;
 
   /**
-   * @param {StoatChannel channel
+   * @param {StoatChannel} channel
    * @param {MessageHandler} handler
    */
   constructor(channel, handler) {
@@ -417,6 +480,29 @@ export class Channel {
     this.handler = handler;
   }
 
+  /** @type {Server} */
+  get server() {
+    return this.channel.server;
+  }
+  /** @type {boolean} */
+  get isVoice() {
+    return this.channel.isVoice;
+  }
+  /** @type {string} */
+  get id() {
+    return this.channel.id;
+  }
+  /**
+   * @param {MessageListener} callback
+   * @param {User} user
+   * @returns {Function} call to remove the listener
+   */
+  onMessageUser(callback, user) {
+    const oid = this.handler.observeUserMessagesChannel(user.id, this.channel, callback);
+    return () => {
+      this.handler.unobserveUserMessagesChannel(oid);
+    }
+  }
   /**
    * @param {string|Object} content
    * @returns {Promise<Message>}
@@ -431,6 +517,14 @@ export class Channel {
    */
   sendEmbed(content, embedOptions={}) {
     return this.handler.sendEmbed(this.channel, content, embedOptions);
+  }
+
+  /**
+   * @returns {Promise<VoiceConnection>}
+   */
+  join() {
+    if (!this.channel.isVoice) throw "Cannot join a text channel. Attempting to 'join' into channel `" + this.channel.id + "`";
+    return this.handler.joinChannel(this.channel.id);
   }
 }
 
