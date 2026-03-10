@@ -12,8 +12,20 @@ const messages = new MessageHandler(client);
 const commands = new CommandHandler(messages);
 
 const helpHandler = new HelpHandler(commands);
-helpHandler.paginationHandler = null;
+//helpHandler.paginationHandler = null;
 helpHandler.commandsPerPage = 1;
+helpHandler.customHelpHandler = (msg) => {
+  const content = [{
+    content: new PageBuilder(`# Home\n\nWelcome to the Remix help page.\n\nRemix is Stoat's first open-source music bot. It supports a variety of streaming services and has many features, with one of the newest being the [Web Dashboard](https://remix.fairuse.org/).\n\nWe hope you enjoy using Remix!\n\nTo get started, just click on the reactions below to find out more about the commands. In the case that reactions don't work for you, there's also the possibility to look through them by using \`${"!"}help <page number>\` :)`).setForm("$content\n\n###### Page $currentPage/$maxPage").setMaxLines(8),
+    reaction: "🏠",
+    title: "Home Page"
+  }, {
+    content: new PageBuilder("If you need help with anything or encounter any issues, hop over to our support server [Remix HQ](https://stt.gg/Remix)!\nAlternatively, you can write a dm to any of the following people:\n\n- <@01FZ5P08W36B05M18FP3HF4PT1> (Community Manager)\n- <@01G9MCW5KZFKT2CRAD3G3B9JN5> (Lead Developer)\n- <@01FVB1ZGCPS8TJ4PD4P7NAFDZA> (Junior Developer)").setForm("# Support\n\n$content\n\n###### Page $currentPage/$maxPage").setMaxLines(8),
+    reaction: "💻",
+    title: "Support Info"
+  }]
+  messages.initCatalog(content, msg);
+}
 commands.setHelpHandler(helpHandler);
 
 const settings = new MySqlSettingsManager(config.mysql, "../storage/defaults.json");

@@ -3,6 +3,8 @@ import { EventEmitter } from "node:events";
 import { Message, MessageHandler, PageBuilder } from "./MessageHandler.mjs";
 import { Channel, Client, Message as StoatMessage, User } from "revolt.js";
 import { SettingsManager } from "./Settings.mjs";
+import path from "node:path";
+import * as fs from "node:fs";
 
 export class CommandBuilder {
   constructor() {
@@ -1042,5 +1044,84 @@ export class CommandHandler extends EventEmitter {
     });
 
     return this.commands;
+  }
+}
+
+export class CommandLoader {
+  /** @type {CommandHandler} */
+  commands;
+
+  /**
+   * @typedef {Function} CommandFunction
+   * @param {Message} message
+   * @param {Object} data The command data from the command handler
+   */
+  /**
+   * @typedef {Object} CJSData
+   * @property {CommandBuilder} command
+   * @property {CommandFunction} run
+   */
+  /**
+   * @typedef {Object} CommandFile
+   * @property {CJSData} default
+   */
+
+  /** @type {Map<string, CommandFile>} */
+  commandFiles = new Map();
+  /** @type {Map<string, CommandFunction>} */
+  runnables = new Map();
+
+  context;
+  constructor(commands, context) {
+    this.commands = commands;
+    this.context = context;
+    this.context.loader ??= this;
+
+    this.commands.on("run", (data) => {
+      if (!this.runnables.has(data.command.uid)) return;
+      const runFc = this.runnables.get(data.command.uid);
+      if (typeof runFc.then === "function") {
+        // async function
+        return runFc.calls(this.context, data.message, data).catch(e => {
+          const id = Utils.uid();
+          console.log("Error running command; error id #" + id, e);
+          data.message.replyEmbed("An error occured. If this happens frequently, please contact ShadowLp174#0667 (<@01G9MCW5KZFKT2CRAD3G3B9JN5>)!\n\nError id: `#" + id + "`", true, { colour: red });
+        });
+      }
+
+      try {
+        runFc.call(this.context, data.message, data);
+      } catch (e) {
+        const id = Utils.uid();
+        console.log("Error running command; error id #" + id, e);
+        data.message.replyEmbed("An error occured. If this happens frequently, please contact ShadowLp174#0667 (<@01G9MCW5KZFKT2CRAD3G3B9JN5>)!\n\nError id: `#" + id + "`", true, { colour: red });
+      }
+    });
+  }
+
+  canonData(cData) {
+    if (cData.default) return cData.default;
+    return cData;
+  }
+  /**
+   * @param {string} dir
+   * @returns {Promise<undefined>}
+   */
+  loadFromDir(dir) {
+    const files = fs.readdirSync(dir).filter(f => f.endsWith(".js") || f.endsWith(".mjs"));
+    return Promise.all(files.map(async commandFile => {
+      const file = path.join(dir, commandFile);
+      const cData = this.canonData(await import(file));
+      const builder = (typeof cData.command === "function") ? cData.command.call(this.context) : cData.command;
+      if (!builder) return console.warn("No builder returned. Skipping '" + commandFile + "'");
+      if (cData.export) this.context[cData.export.name] = cData.export.object;
+      this.commands.addCommand(builder);
+      this.commandFiles.set(builder.uid, file);
+      if (!cData.run) return;
+      this.runnables.set(builder.uid, cData.run);
+      builder.subcommands.forEach(sub => {
+        this.runnables.set(sub.uid, cData.run);
+      });
+    }));
   }
 }
