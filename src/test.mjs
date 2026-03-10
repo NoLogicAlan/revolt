@@ -4,12 +4,26 @@ import * as fs from "fs";
 import { Utils } from "./Utils.mjs";
 import { CommandBuilder, CommandHandler, HelpHandler, PrefixManager } from "./CommandHandler.mjs";
 import { MySqlSettingsManager } from "./Settings.mjs";
+import { Revoice } from "revoice.js";
+import { PlayerManager } from "./PlayerManager.mjs";
 
 const config = JSON.parse(fs.readFileSync("../config.json"));
 
 const client = new Client();
 const messages = new MessageHandler(client);
-const commands = new CommandHandler(messages);
+const revoice = new Revoice(config.token || config.login, config["revolt-api"]);
+const commands = new CommandHandler(messages, revoice);
+const settings = new MySqlSettingsManager(config.mysql, "../storage/defaults.json");
+commands.setPrefixManager(new PrefixManager(settings));
+
+const players = new PlayerManager(revoice, settings, commands, {
+  config,
+  player: {
+    revoice,
+    client,
+    config
+  }
+})
 
 const helpHandler = new HelpHandler(commands);
 //helpHandler.paginationHandler = null;
@@ -27,10 +41,6 @@ helpHandler.customHelpHandler = (msg) => {
   messages.initCatalog(content, msg);
 }
 commands.setHelpHandler(helpHandler);
-
-const settings = new MySqlSettingsManager(config.mysql, "../storage/defaults.json");
-
-commands.setPrefixManager(new PrefixManager(settings));
 
 commands.addCommand(new CommandBuilder()
   .setName("test")
@@ -51,6 +61,10 @@ client.on("ready", async () => {
   console.log("ready");
 
   const channel = messages.getChannel("01JMJEG538ZPW3DNBDR4N18414");
+  channel.onMessageUser(async (m) => {
+    if (m.content !== "join") return;
+    const p = await players.getPlayer(m);
+  }, client.users.get("01G9MCW5KZFKT2CRAD3G3B9JN5"));
   //await channel.sendEmbed("Hi!")
   const msg = await messages.getOrFetch("01KJZJXSBQVW27PXPWEAZFADC5", "01JMJEG538ZPW3DNBDR4N18414");
   console.log(msg);

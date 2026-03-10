@@ -540,6 +540,7 @@ class RevoltPlayer extends EventEmitter {
   join(channel) {
     return new Promise(res => {
       console.log("channel: ", channel)
+      console.log(this.LEAVE_TIMEOUT);
       this.voice.join(channel, this.LEAVE_TIMEOUT).then((connection) => {
         //console.log(connection);
         this.connection = connection;

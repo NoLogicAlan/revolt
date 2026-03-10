@@ -17,7 +17,7 @@ export class MessageHandler {
    * @public
    */
   revoice;
-  LEAVE_TIMEOUT = 60 * 1000;
+  LEAVE_TIMEOUT = 60;
 
   /**
    * @param {Client} client
