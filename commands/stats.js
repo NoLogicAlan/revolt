@@ -13,8 +13,8 @@ module.exports = {
     const users = (this.config.fetchUsers) ? `\n👤 User Count: \`${this.client.users.size()}\`` : "";
     // TODO: implement better way of measuring ping
     const start = Date.now();
-    const msg = await message.channel.sendMessage(this.em(`__**Stats:**__\n\n📂 Server Count: \`${this.client.servers.size()}\`${users}\n📣 Player Count: \`${this.revoice.connections.size}\`\n🏓 Ping: \`...\`\n⌛ Uptime: \`${time}\`\n${reason}${version}${footer}`, message));
+    const msg = await message.channel.sendEmbed(`__**Stats:**__\n\n📂 Server Count: \`${this.client.servers.size()}\`${users}\n📣 Player Count: \`${this.revoice.connections.size}\`\n🏓 Ping: \`...\`\n⌛ Uptime: \`${time}\`\n${reason}${version}${footer}`);
     const ping = Date.now() - start;
-    msg.edit(this.em(`__**Stats:**__\n\n📂 Server Count: \`${this.client.servers.size()}\`${users}\n📣 Player Count: \`${this.revoice.connections.size}\`\n🏓 Ping: \`${ping}ms\`\n⌛ Uptime: \`${time}\`\n${reason}${version}${footer}`, message));
+    msg.editEmbed(`__**Stats:**__\n\n📂 Server Count: \`${this.client.servers.size()}\`${users}\n📣 Player Count: \`${this.revoice.connections.size}\`\n🏓 Ping: \`${ping}ms\`\n⌛ Uptime: \`${time}\`\n${reason}${version}${footer}`);
   }
 }

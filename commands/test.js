@@ -25,9 +25,11 @@ module.exports = {
     const uploader = new Uploader(this.client);
     console.log(data.options);
     const id = await uploader.uploadFile("./dashboard/static/assets/icon.png", "img");
-    const embed = this.em("Ref String: " + data.get("string").value + "; " + data.get("test").value + "; Option received: " + data.getById("testOption")?.value, msg);
-    embed.embeds[0].media = id;
-    embed.attachments = [id];
-    msg.reply(embed, false)
+    msg.replyEmbed({
+      embedText: "Ref String: " + data.get("string").value + "; " + data.get("test").value + "; Option received: " + data.getById("testOption")?.value,
+      attachments: [id]
+    }, false, {
+      media: id
+    })
   }
 }
