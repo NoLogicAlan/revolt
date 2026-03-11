@@ -554,6 +554,10 @@ export class Message {
   get author() {
     return this.message.author;
   }
+  /** @type {string} */
+  get authorId() {
+    return this.message.authorId;
+  }
   /** @type {ServerMember} */
   get member() {
     return this.message.member;

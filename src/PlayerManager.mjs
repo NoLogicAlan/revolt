@@ -139,7 +139,7 @@ export class PlayerManager {
           res(p);
         });
       }));
-      if (!p.connection.users.find(u => u.id == message.author.id)) {
+      if (!player.connection.users.find(u => u.id == message.author.id)) {
         message.replyEmbed("You don't seem to be connected to <#" + cid + ">. Did you forget to join?", true);
       }
       return player;
@@ -156,6 +156,19 @@ export class PlayerManager {
     player = this.playerMap.get(cid);
     return player;
   }
+  /**
+   * @param {Message} msg
+   * @param {string} cid
+   * @returns {Promise<undefined>}
+   */
+  async leave(msg, cid) {
+    const p = this.playerMap.get(cid);
+    const m = await msg.replyEmbed("Leaving...");
+    const left = p.leave();
+    p.destroy();
+    m.editEmbed((left) ? `✅ Successfully Left` : `Not connected to any voice channel`);
+  }
+
 
   /**
    * @param {Message} message

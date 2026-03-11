@@ -4,6 +4,10 @@ import VoiceImport from "revoice.js";
 const { MediaPlayer, Revoice } = VoiceImport;
 import Uploader from "revolt-uploader";
 import meta from "./probe.js";
+import { Client } from "revolt.js";
+import { Worker } from "node:worker_threads";
+import { spawn } from "node:child_process";
+import { PassThrough } from "node:stream";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
@@ -49,13 +53,13 @@ export class Queue extends EventEmitter {
   next() {
     const previous = this.current;
     if (this.songLoop && this.current) return this.current;
-    if (this.loop && this.current) data.push(current);
+    if (this.loop && this.current) data.push(this.current);
     if (this.isEmpty()) return null;
     this.current = this.data.shift();
     this.emit("queue", {
       type: "update",
       data: {
-        current: current,
+        current: this.current,
         old: previous,
         loop: this.loop
       }
@@ -172,7 +176,16 @@ export default class Player extends EventEmitter {
   startedPlaying;
   LEAVE_TIMEOUT = 45;
   leaving = false;
+  searches = new Map();
+  resultLimit = 5; // number of search restults fetched
 
+  /**
+   * @param {string} token
+   * @param {Object} opts
+   * @param {Revoice} opts.voice
+   * @param {Client} opts.client
+   * @param {Object} opts.config Remix config.json file parsed to an object
+   */
   constructor(token, opts) {
     super();
     this.queue = new Queue();
@@ -581,5 +594,89 @@ export default class Player extends EventEmitter {
         });
       });
     });
+  }
+  fetchResults(query, id, provider = "yt") { // TODO: implement pagination of further results
+    const providerNames = {
+      yt: "YouTube",
+      ytm: "YouTube Music",
+      scld: "SoundCloud",
+    };
+    return new Promise(res => {
+      let list = `Search results using **${providerNames[provider] || "YouTube"}**:\n\n`;
+      this.workerJob("searchResults", { query: query, provider: provider, resultCount: this.resultLimit }, () => { }).then((data) => {
+        data.data.forEach((v, i) => {
+          const url = v.url || v.permalink_url || "";
+          const title = v.title || v.name || "Unknown";
+          const dur = v.duration ? this.getDuration(v.duration) : "?:??";
+          list += `${i + 1}. [${title}](${url}) - ${dur}\n`;
+        });
+        list += "\nSend the number of the result you'd like to play here in this channel. Example: `2`\nTo cancel this process, just send an 'x'!";
+        this.searches.set(id, data.data);
+        res({ m: list, count: data.data.length });
+      });
+    });
+  }
+  playResult(id, result = 0, next = false) {
+    if (!this.searches.has(id)) return null;
+    const res = this.searches.get(id)[result];
+
+    let prep = this.preparePlay();
+    if (prep) return prep;
+
+    this.addToQueue(res, next);
+    if (!this.queue.getCurrent()) this.playNext();
+    return res;
+  }
+  playFirst(query, provider) {
+    return this.play(query, true, provider);
+  }
+  play(query, top = false, provider) { // top: where to add the results in the queue (top/bottom)
+    let prep = this.preparePlay();
+    if (prep) return prep;
+
+    const events = new EventEmitter();
+    this.workerJob("generalQuery", { query: query, spotify: this.spotifyConfig, provider: provider }, (msg) => {
+      events.emit("message", msg);
+    }).then((data) => {
+      if (data.type == "list") {
+        data.data.forEach(vid => {
+          this.addToQueue(vid, top);
+        });
+      } else if (data.type == "video") {
+        this.addToQueue(data.data, top);
+      } else {
+        console.log("Unknown case: ", data.type, data);
+      }
+      if (!this.queue.getCurrent()) this.playNext();
+    }).catch(reason => {
+      console.log("reason", reason);
+      reason = reason || "An error occured. Please contact the support if this happens reocurringly.";
+      events.emit("message", reason);
+    });
+    return events;
+  }
+  playRadio(radio, top = false) {
+    let prep = this.preparePlay();
+    if (prep) return prep;
+
+    const url = radio.url;
+    const name = radio.detailedName;
+    const description = radio.description;
+    const thumbnail = radio.thumbnail;
+
+    this.addToQueue({
+      type: "radio",
+
+      title: name,
+      description,
+      url,
+      author: {
+        name: radio.author.name,
+        url: radio.author.url
+      },
+      thumbnail,
+    }, top);
+
+    if (!this.queue.getCurrent()) this.playNext();
   }
 }
