@@ -195,7 +195,8 @@ export default class Player extends EventEmitter {
     };
 
     this.upload = opts.uploader || new Uploader(opts.client, true);
-
+    this.innertube = opts.innertube;
+    this.ytdlp = opts.ytdlp;
   }
 
   workerJob(jobId, data, onMessage = null, msg = null) {

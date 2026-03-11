@@ -1126,7 +1126,7 @@ export class CommandLoader {
    * @returns {Promise<undefined>}
    */
   loadFromDir(dir) {
-    const files = fs.readdirSync(dir).filter(f => f.endsWith(".js") || f.endsWith(".mjs"));
+    const files = fs.readdirSync(dir).filter(f => !f.startsWith(".") && (f.endsWith(".js") || f.endsWith(".mjs")));
     return Promise.all(files.map(async commandFile => {
       const file = path.join(dir, commandFile);
       const cData = this.canonData(await import(file));
