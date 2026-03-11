@@ -33,6 +33,21 @@ export class Utils {
     return result.trim();
   }
   /**
+   * Shuffles an array, should be in-place. Array is returned anyways.
+   * @param {any[]} a
+   * @returns {any[]}
+   */
+  static shuffleArr(a) {
+    var j, x, i;
+    for (i = a.length - 1; i > 0; i--) {
+      j = Math.floor(Math.random() * (i + 1));
+      x = a[i];
+      a[i] = a[j];
+      a[j] = x;
+    }
+    return a;
+  }
+  /**
    * Generate a random id. I do not guarantee uniqueness in all cases, it should be fine however (Date + random).
    * @returns {string}
    */

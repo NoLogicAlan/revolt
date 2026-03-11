@@ -1,5 +1,5 @@
 import { Revoice } from "revoice.js";
-import RevoltPlayer from "../Player.js";
+import Player from "./Player.mjs";
 import { CommandHandler } from "./CommandHandler.mjs";
 import { Message } from "./MessageHandler.mjs";
 import { SettingsManager } from "./Settings.mjs";
@@ -11,7 +11,7 @@ export class PlayerManager {
   settings;
   /** @type {CommandHandler} */
   commands;
-  /** @type {Map<string, RevoltPlayer>} */
+  /** @type {Map<string, Player>} */
   playerMap = new Map();
   /** @type {Object} */
   config;
@@ -124,7 +124,7 @@ export class PlayerManager {
    * If the user is not connected yet and promptJoin is set to true, connecting to the channel will be attempted.
    * @param {Message} message
    * @param {boolean} [promptJoin] Defaults to true
-   * @returns {Promise<RevoltPlayer>}
+   * @returns {Promise<Player>}
    */
   async getPlayer(message, promptJoin = true, verifyUser=true) {
     const user = this.revoice.getUser(message.author.id).user;
@@ -170,7 +170,7 @@ export class PlayerManager {
       cb(this.playerMap.get(cid));
       return message.replyEmbed("Already joined <#" + cid + ">.");
     }
-    const p = new RevoltPlayer(this.config.token, {
+    const p = new Player(this.config.token, {
       ...this.playerConfig,
       messageChannel: message.channel
     });
