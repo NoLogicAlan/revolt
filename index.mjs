@@ -11,13 +11,16 @@ import Player from "./src/Player.mjs";
 const YTDlpWrap = YTDlpWrapE.default;
 import { Innertube, Platform } from "youtubei.js";
 import { generate } from "youtube-po-token-generator";
+import childProcess from "node:child_process";
 
 class Remix {
   constructor() {
     const config = JSON.parse(fs.readFileSync("config.json"));
     this.config = config;
 
-    const client = new Client();
+    const client = new Client({
+      ...config["stoat.js"],
+    });
     this.client = client;
     const messages = new MessageHandler(this.client);
     this.messages = messages;
@@ -61,10 +64,10 @@ class Remix {
     this.initInnertube();
 
     try {
-      this.comHash = require('child_process')
+      this.comHash = childProcess
         .execSync('git rev-parse --short HEAD', { cwd: __dirname })
         .toString().trim();
-      this.comHashLong = require('child_process')
+      this.comHashLong = childProcess
         .execSync('git rev-parse HEAD', { cwd: __dirname })
         .toString().trim();
     } catch (e) {

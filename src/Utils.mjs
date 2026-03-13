@@ -5,7 +5,7 @@ export class Utils {
   static isNumber(n) {
     return !isNaN(n) && !isNaN(parseFloat(n));
   }
-  static prettifyMS() {
+  static prettifyMS(milliseconds) {
     const roundTowardsZero = milliseconds > 0 ? Math.floor : Math.ceil;
 
     const parsed = {

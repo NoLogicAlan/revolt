@@ -8,6 +8,7 @@ import { Client } from "revolt.js";
 import { Worker } from "node:worker_threads";
 import { spawn } from "node:child_process";
 import { PassThrough } from "node:stream";
+import https from "node:https";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
@@ -321,7 +322,6 @@ export default class Player extends EventEmitter {
   uploadThumbnail() {
     return new Promise((res) => {
       //return res();
-      const https = require("https");
       const current = this.queue.getCurrent();
       if (!current) return res(null);
       if (!current.thumbnail) return res(null);

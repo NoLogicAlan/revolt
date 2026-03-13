@@ -282,7 +282,7 @@ export class MessageHandler {
       console.log("[MessageHandler] SendMessage: Missing SendMessage permission in `" + channel.id + "`");
       return;
     }
-    return new Message(await channel.sendMessage(message));
+    return new Message(await channel.sendMessage(message), this);
   }
   /**
    * @param {StoatChannel} channel
@@ -303,7 +303,7 @@ export class MessageHandler {
         ...content
       }
     }
-    return channel.sendMessage(embed);
+    return new Message(await channel.sendMessage(embed), this);
   }
 
   /**

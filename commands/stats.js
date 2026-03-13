@@ -1,4 +1,6 @@
 const { CommandBuilder } = require("../Commands.js");
+const { Utils } = require("../src/Utils.mjs");
+
 module.exports = {
   command: new CommandBuilder()
     .setName("stats")
@@ -8,7 +10,7 @@ module.exports = {
   run: async function(message) {
     const reason = (this.config.restart) ? "🪛 Cause for last restart: `" + this.config.restart + "`\n": "";
     const version = "🏦 Build: [`" + this.comHash + "`](" + this.comLink + ") 🔗";
-    const time = this.prettifyMS(Math.round(process.uptime()) * 1000);
+    const time = Utils.prettifyMS(Math.round(process.uptime()) * 1000);
     const footer = this.config.customStatsFooter || "";
     const users = (this.config.fetchUsers) ? `\n👤 User Count: \`${this.client.users.size()}\`` : "";
     // TODO: implement better way of measuring ping
