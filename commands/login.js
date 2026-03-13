@@ -15,6 +15,6 @@ module.exports = {
     const m = (typeof verified == "string")
       ? "Login failed! Reason: `" + verified + "`. If this is an error and the issue persist, please contact a team member through the server in my description."
       : (verified == true) ? "Login succeeded! You can continue to the webpage now." : "An unknown error occured. Please contact a team member if this issue persists!";
-    msg.reply(this.em(m, msg), false);
+    msg.replyEmbed(m);
   }
 }

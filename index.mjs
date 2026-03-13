@@ -38,13 +38,27 @@ class Remix {
     }
 
     client.on("ready", () => {
-      console.log("ready");
+      console.log("Logged in as " + client.user.username);
     });
 
     const loader = new CommandLoader(commands, this);
     const __dirname = import.meta.dirname;
     const dir = path.join(__dirname, "commands");
-    loader.loadFromDir(dir);
+    console.log("Started loading commands.")
+    loader.loadFromDir(dir).then(() => {
+      console.log("Commands loaded.");
+    });
+
+    console.log("Loading Modules.");
+    this.loadedModules = new Map();
+    this.modules = JSON.parse(fs.readFileSync("./storage/modules.json"));
+    Promise.all(this.modules.map(async m => {
+      if (!m.enabled) return;
+      const mod = { instance: (new ((await import(m.index)).default)(this)), c: (await import(m.index)).default };
+      this.loadedModules.set(m.name, mod);
+    })).then(() => {
+      console.log("Modules loaded.");
+    });
 
     this.revoice = new Revoice(config.token || config.login, config["revolt-api"]);
     this.observedVoiceUsers = new Map();
@@ -108,7 +122,35 @@ class Remix {
    * @returns {Player}
    */
   getPlayer(message, promptJoin, verifyUser) {
-    return this.players.getPlayer(message)
+    return this.players.getPlayer(message, promptJoin, verifyUser);
+  }
+  /**
+   * @param {User[]} users
+   * @returns {Promise<Object[]>}
+   */
+  getSharedServers(user) {
+    return new Promise(async (res, _rej) => {
+      const data = await user.fetchMutual();
+      if (!data) res(null);
+      var servers = data.servers.map(s => this.client.servers.get(s));
+
+      servers = servers.map((server) => {
+        const icon = () => {
+          try {
+            return server.animatedIconURL || server.iconURL || null
+          } catch (e) {
+            return null;
+          }
+        }
+        return {
+          name: server.name,
+          id: server.id,
+          icon: icon(),
+          voiceChannels: server.channels.filter(c => c.type == "VoiceChannel").map(c => ({ name: c.name, id: c.id, icon: c.animatedIconURL || c.iconURL || null })) // TODO: fetch users as well
+        }
+      });
+      res(servers);
+    });
   }
   /**
    * @param {string} form
@@ -205,3 +247,17 @@ class Remix {
 }
 
 const remix = new Remix();
+
+// God, please forgive us, this is just to keep the bot online at all cost
+process.on("unhandledRejection", (reason, p) => {
+  console.log(" [Error_Handling] :: Unhandled Rejection/Catch");
+  console.log(reason, p);
+});
+process.on("uncaughtException", (err, origin) => {
+  console.log(" [Error_Handling] :: Uncaught Exception/Catch");
+  console.log(err, origin);
+});
+process.on("uncaughtExceptionMonitor", (err, origin) => {
+  console.log(" [Error_Handling] :: Uncaught Exception/Catch (MONITOR)");
+  console.log(err, origin);
+});
