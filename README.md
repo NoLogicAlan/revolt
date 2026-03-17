@@ -107,7 +107,7 @@ If you have any questions or would like to talk with other Remix users you can j
 
 ---
 
-&copy; 2026 Remix. All Rights Reserved.
+&copy; 2026 Remix. Code licensed under [MIT](LICENSE). The Remix name and branding are proprietary and may not be reused.
 
 
 
