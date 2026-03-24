@@ -57,7 +57,7 @@ export class Queue extends EventEmitter {
   next() {
     const previous = this.current;
     if (this.songLoop && this.current) return this.current;
-    if (this.loop && this.current) data.push(this.current);
+    if (this.loop && this.current) this.data.push(this.current);
     if (this.isEmpty()) return null;
     this.current = this.data.shift();
     this.emit("queue", {
@@ -453,7 +453,6 @@ export default class Player extends EventEmitter {
       })).url;
     }
     const stream = await this.streamResource(streamUrl);
-    console.log("stream", stream);
 
     if (!stream) {
       this.emit("stopplay");
