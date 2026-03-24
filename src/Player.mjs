@@ -444,7 +444,6 @@ export default class Player extends EventEmitter {
 
     const connection = this.voice.getVoiceConnection(this.connection.channelId);
     var streamUrl;
-    console.log("songData", songData);
     if (songData.type == "external" || songData.type == "radio") {
       streamUrl = songData.url;
     } else if (songData.encoded) {

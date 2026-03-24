@@ -7,6 +7,18 @@
   "stoat.js": {
     "heartbeatInterval": 30000
   },
+  "nodelink": {
+    "nodes": [
+      {
+        "identifier": "main",
+        "host": "127.0.0.1",
+        "port": 2333,
+        "password": "password",
+        "secure": false,
+        "priority": 1
+      }
+    ]
+  },
   "prefix": "your desired prefix (such as %)",
   "presenceInterval": null,
   "presenceContents": [],
