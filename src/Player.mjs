@@ -317,7 +317,7 @@ export default class Player extends EventEmitter {
     if (current.type === "external") {
       return { msg: "Playing **[" + current.title + "](" + current.url + ") by [" + current.artist + "](" + current.author.url + ")** \n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() }
     }
-    return { msg: "Playing: **[" + current.title + "](" + (current.spotifyUrl || current.url) + ")** (" + this.getCurrentElapsedDuration() + "/" + this.getCurrentDuration() + ")" + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() };
+    return { msg: "Playing: **[" + current.title + "](" + (current.spotifyUrl || current.url) + ")** (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(this.queue.current.duration) + ")" + "\n\nVolume: " + vol + "\n\nQueue loop: " + loopqueue + "\nSong loop: " + songloop, image: await this.uploadThumbnail() };
   }
   uploadThumbnail() {
     return new Promise((res) => {
@@ -376,7 +376,7 @@ export default class Player extends EventEmitter {
     if (typeof duration === "object") {
       return duration.timestamp;
     } else {
-      return Utils.prettifyMS(duration);
+      return Utils.prettifyMS(duration, "h:!m:!s");
     }
   }
   /**
