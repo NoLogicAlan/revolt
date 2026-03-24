@@ -5,12 +5,15 @@ import * as fs from "node:fs";
 
 import { PROVIDERS } from "./constants/Providers.mjs";
 import { Utils } from "./Utils.mjs";
+import path from "node:path";
 
 export class YTUtils extends EventEmitter {
   constructor() {
     super();
 
-    const config = JSON.parse(fs.readFileSync("../config.json"));
+    const __dirname = import.meta.dirname;
+    const configPath = path.join(__dirname, "../config.json")
+    const config = JSON.parse(fs.readFileSync(configPath));
 
     this.nodelink = new Manager({
       nodes: config.nodelink.nodes
@@ -40,7 +43,7 @@ export class YTUtils extends EventEmitter {
     if (node) return node;
 
     return new Promise((res) => {
-      this.nodelink.on("nodeReady", () => {
+      this.nodelink.once("nodeReady", () => {
         res(this.nodelink.nodes.findNode());
       });
     })
@@ -137,8 +140,6 @@ export class YTUtils extends EventEmitter {
     * @returns {Promise<MediaData|boolean>}
     */
   async getUrlData(url) {
-    console.log(url);
-    await this.waitReady();
     this.emit("message", "⏳ Loading...");
     const node = await this.getNode();
     var data;

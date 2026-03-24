@@ -9,7 +9,9 @@ import { Worker } from "node:worker_threads";
 import { spawn } from "node:child_process";
 import { PassThrough } from "node:stream";
 import https from "node:https";
-import { Manager } from "moonlink.js";
+import { Manager, Node } from "moonlink.js";
+import path from "node:path";
+import axios from "axios";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
@@ -201,17 +203,23 @@ export default class Player extends EventEmitter {
     this.ytdlp = opts.ytdlp;
 
     this.nodelink = opts.nodelink;
+    this.nodelinkReady = !!opts.nodelink;
     if (!this.nodelink) {
       this.nodelink = new Manager({
         nodes: opts.config.nodelink.nodes
+      });
+      this.nodelink.on("nodeReady", () => {
+        this.nodelinkReady = true;
+        this.emit("nodeReady");
       });
       this.nodelink.init("648200414054842368");
     }
   }
 
   workerJob(jobId, data, onMessage = null, msg = null) {
+    const __dirname = import.meta.dirname;
     return new Promise((res, rej) => {
-      const worker = new Worker('./worker.mjs', { workerData: { jobId, data } });
+      const worker = new Worker(path.join(__dirname, './worker.mjs'), { workerData: { jobId, data } });
       worker.on("message", (data) => {
         data = JSON.parse(data);
         if (data.event == "error") {
@@ -398,50 +406,33 @@ export default class Player extends EventEmitter {
   // functional core
   // TODO: potentially touch up the following parts as well
   async streamResource(url) {
-    const axios = require('axios');
     const response = await axios({ method: 'get', url: url, responseType: 'stream' });
     return response.data;
   }
+  /**
+   *Waits for a NodeLink node to become ready
+   * @returns {Promise<undefined>}
+   */
+  async waitReady() {
+    if (this.nodelinkReady) return;
 
-  async getYoutubeiStream(videoId) {
-    try {
-      const innertube = this.innertube;
-      // Try TV and ANDROID clients as they have less strict PoToken requirements currently
-      const clients = ["TV", "ANDROID", "YTMUSIC", "WEB"];
-      let webStream = null;
-      let lastErr = null;
+    return new Promise(res => {
+      this.once("nodeReady", res);
+    });
+  }
+  /**
+   * @returns {Promise<Node>}
+   */
+  async getNode() {
+    await this.waitReady();
+    const node = this.nodelink.nodes.findNode();
+    if (node) return node;
 
-      for (const client of clients) {
-        try {
-          webStream = await innertube.download(videoId, { type: "audio", quality: "best", client });
-          console.log("[Player] youtubei.js stream acquired via client:", client);
-          break;
-        } catch (e) {
-          console.warn(`[Player] client ${client} failed:`, e.message);
-          lastErr = e;
-        }
-      }
-
-      if (!webStream) throw lastErr;
-
-      const passThrough = new PassThrough();
-      const reader = webStream.getReader();
-      (async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) { passThrough.end(); break; }
-            passThrough.write(value);
-          }
-        } catch (e) {
-          passThrough.destroy(e);
-        }
-      })();
-      return passThrough;
-    } catch (err) {
-      console.error("[Player] youtubei.js fallback failed:", err.message);
-      return null;
-    }
+    return new Promise((res) => {
+      this.nodelink.once("nodeReady", () => {
+        res(this.nodelink.nodes.findNode());
+      });
+    });
   }
 
   async playNext() {
@@ -453,83 +444,15 @@ export default class Player extends EventEmitter {
 
     const connection = this.voice.getVoiceConnection(this.connection.channelId);
     let stream;
-    if (songData.type == "soundcloud") {
-      let ytdlpPath = (typeof this.ytdlp === "string") ? this.ytdlp : (this.ytdlp?.binaryPath || "yt-dlp");
-      const proc = spawn(ytdlpPath, ["-f", "bestaudio/best", "--no-playlist", "-o", "-", "--quiet", songData.url]);
-      stream = proc.stdout;
-    } else if (songData.type == "external" || songData.type == "radio") {
+    console.log("songData", songData);
+    if (songData.type == "external" || songData.type == "radio") {
       stream = await this.streamResource(songData.url);
-    } else {
-      const videoId = songData.videoId || (songData.url && (
-        (songData.url.match(/[?&]v=([^&]{11})/) || [])[1] ||
-        (songData.url.match(/youtu\.be\/([^?]{11})/) || [])[1]
-      ));
-      if (this.ytdlp) {
-        console.log("[Player] Attempting yt-dlp for:", videoId);
-        let ytdlpPath = (typeof this.ytdlp === "string") ? this.ytdlp : (this.ytdlp.binaryPath || "yt-dlp");
-
-        const proc = spawn(ytdlpPath, [
-          "--cookies", "/root/revolt/cookies.txt",
-          "--js-runtimes", "node",
-          "-f", "251/250/249/bestaudio",
-          "--no-playlist", "-o", "-", "--quiet", "--no-cache-dir", "--force-ipv4",
-          "https://www.youtube.com/watch?v=" + videoId
-        ]);
-
-        const passThrough = new PassThrough();
-        stream = passThrough;
-        let ytdlpFallbackTriggered = false;
-
-        proc.stdout.pipe(passThrough);
-
-        proc.stderr.on("data", async (d) => {
-          if (ytdlpFallbackTriggered) return;
-          const msg = d.toString();
-          // catches any auth/block variant YouTube may send
-          const isBlocked = (
-            msg.includes("Sign in") ||
-            msg.includes("bot") ||
-            msg.includes("HTTP Error 403") ||
-            msg.includes("HTTP Error 429") ||
-            msg.includes("Precondition") ||
-            msg.includes("This video is not available") ||
-            msg.includes("blocked") ||
-            msg.includes("login") ||
-            msg.includes("Private video") ||
-            msg.includes("Video unavailable")
-          );
-          if (isBlocked) {
-            ytdlpFallbackTriggered = true;
-            console.warn("[Player] yt-dlp blocked. Switching to youtubei.js...");
-            proc.stdout.unpipe(passThrough);
-            proc.kill();
-            const fallback = await this.getYoutubeiStream(videoId);
-            if (fallback) {
-              fallback.pipe(passThrough);
-            } else {
-              passThrough.destroy(new Error("Both yt-dlp and youtubei.js failed"));
-            }
-          }
-        });
-
-        // yt-dlp exits non-zero but stderr didn't match any known pattern
-        proc.on("close", async (code) => {
-          if (ytdlpFallbackTriggered) return;
-          if (code !== 0 && !passThrough.destroyed) {
-            ytdlpFallbackTriggered = true;
-            console.warn("[Player] yt-dlp exited with code", code, " falling back to youtubei.js...");
-            const fallback = await this.getYoutubeiStream(videoId);
-            if (fallback) {
-              fallback.pipe(passThrough);
-            } else {
-              passThrough.destroy(new Error("Both yt-dlp and youtubei.js failed"));
-            }
-          }
-        });
-      } else {
-        stream = await this.getYoutubeiStream(videoId);
-      }
+    } else if (songData.encoded) {
+      stream = await (await this.getNode()).getDirectStream({
+        encoded: songData.encoded
+      });
     }
+    console.log("stream", stream);
 
     if (!stream) {
       this.emit("stopplay");

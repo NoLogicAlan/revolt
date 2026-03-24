@@ -103,5 +103,3 @@ export class Utils {
     return (new Date().valueOf().toString(36) + Math.random().toString(36).substr(2)).toUpperCase();
   }
 }
-
-console.log(Utils.prettifyMS(Date.now(), "h:m:!s"))
