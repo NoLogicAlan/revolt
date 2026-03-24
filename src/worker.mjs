@@ -16,7 +16,10 @@ export class YTUtils extends EventEmitter {
     const config = JSON.parse(fs.readFileSync(configPath));
 
     this.nodelink = new Manager({
-      nodes: config.nodelink.nodes
+      nodes: config.nodelink.nodes,
+      options: {
+        clientName: "RemixStoat-Worker/1.0.0"
+      }
     });
 
     this.ready = false;

@@ -5,10 +5,8 @@ import { CommandHandler, CommandLoader, PrefixManager } from "./src/CommandHandl
 import { Message, MessageHandler, PageBuilder } from "./src/MessageHandler.mjs";
 import { MySqlSettingsManager } from "./src/Settings.mjs";
 import { Revoice } from "revoice.js";
-import YTDlpWrapE from "yt-dlp-wrap-extended";
 import { PlayerManager } from "./src/PlayerManager.mjs";
 import Player from "./src/Player.mjs";
-const YTDlpWrap = YTDlpWrapE.default;
 import childProcess from "node:child_process";
 import { Manager } from "moonlink.js";
 
@@ -61,18 +59,6 @@ class Remix {
 
     this.revoice = new Revoice(config.token || config.login, config["revolt-api"]);
     this.observedVoiceUsers = new Map();
-    if (!fs.existsSync("./bin")) fs.mkdirSync("./bin");
-    const ytdlPath = path.join(__dirname, "./bin/ytdlp.bin");
-    if (!fs.existsSync(ytdlPath)) {
-      console.log("Downloading yt-dlp binaries.");
-      YTDlpWrap.downloadFromGithub(ytdlPath).then(() => {
-        console.log("Finished downloading yt-dlp binaries.");
-        this.ytdlp = new YTDlpWrap(ytdlPath);
-        this.playerContext.ytdlp = this.ytdlp;
-      });
-    } else {
-      this.ytdlp = new YTDlpWrap(ytdlPath);
-    }
 
     try {
       this.comHash = childProcess
@@ -88,7 +74,10 @@ class Remix {
     }
 
     this.nodelink = new Manager({
-      nodes: this.config.nodelink.nodes
+      nodes: this.config.nodelink.nodes,
+      config: {
+        clientName: "RemixStoat-Main/1.0.0"
+      }
     });
     this.nodelink.init("648200414054842368").then(() => {
       console.log("NodeLink initialised");
@@ -98,8 +87,6 @@ class Remix {
       voice: this.revoice,
       client: this.client,
       config,
-      ytdlp: this.ytdlp,
-      innertube: this.innertube,
       nodelink: this.nodelink,
     }
     this.players = new PlayerManager(this.revoice, settings, commands, {

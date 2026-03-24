@@ -206,7 +206,10 @@ export default class Player extends EventEmitter {
     this.nodelinkReady = !!opts.nodelink;
     if (!this.nodelink) {
       this.nodelink = new Manager({
-        nodes: opts.config.nodelink.nodes
+        nodes: opts.config.nodelink.nodes,
+        config: {
+          clientName: "RemixStoat-Player/1.0.0"
+        }
       });
       this.nodelink.on("nodeReady", () => {
         this.nodelinkReady = true;
@@ -306,6 +309,24 @@ export default class Player extends EventEmitter {
     });
     if (this.queue.isEmpty() && !current) text += "--- Empty ---";
     return text;
+  }
+  async lyrics() {
+    const current = this.queue.getCurrent();
+    if (!current) return [];
+    const node = await this.getNode();
+    var results;
+    if (current.encoded) {
+      results = await node.loadLyrics({
+        encoded: current.encoded
+      });
+    } else {
+      results = await node.loadLyrics(current.title);
+    }
+    // TODO: add synchronisation, possibly
+    return {
+      lines: results.data?.lines.map(e => e.text),
+      provider: results.data?.provider
+    };
   }
   loop(choice) {
     if (!["song", "queue"].includes(choice)) return "'" + choice + "' is not a valid option. Valid are: `song`, `queue`";
@@ -447,9 +468,16 @@ export default class Player extends EventEmitter {
     if (songData.type == "external" || songData.type == "radio") {
       streamUrl = songData.url;
     } else if (songData.encoded) {
-      streamUrl = (await (await this.getNode()).getDirectStream({
+      console.log("songData", songData);
+      const node = await this.getNode();
+      //node.loadDirectStream(); // TODO: use loadStream to restart from a given timestamp
+      streamUrl = (await node.getDirectStream({
         encoded: songData.encoded
-      })).url;
+      }))?.url;
+    }
+    if (!streamUrl) {
+      this.emit("stopplay");
+      return false;
     }
     const stream = await this.streamResource(streamUrl);
 
