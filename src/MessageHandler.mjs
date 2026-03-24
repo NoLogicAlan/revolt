@@ -566,6 +566,10 @@ export class Message {
   get channel() {
     return this.handler.getChannel(this.message.channel.id);
   }
+  /** @type {Server} */
+  get server() {
+    return this.message.server;
+  }
 
   /**
    * onReaction Listens for reactions to this message. If called twice with different arguments, the latest function call will be valid and function as an observer.

@@ -9,6 +9,7 @@ import { Worker } from "node:worker_threads";
 import { spawn } from "node:child_process";
 import { PassThrough } from "node:stream";
 import https from "node:https";
+import { Manager } from "moonlink.js";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
@@ -198,11 +199,19 @@ export default class Player extends EventEmitter {
     this.upload = opts.uploader || new Uploader(opts.client, true);
     this.innertube = opts.innertube;
     this.ytdlp = opts.ytdlp;
+
+    this.nodelink = opts.nodelink;
+    if (!this.nodelink) {
+      this.nodelink = new Manager({
+        nodes: opts.config.nodelink.nodes
+      });
+      this.nodelink.init("648200414054842368");
+    }
   }
 
   workerJob(jobId, data, onMessage = null, msg = null) {
     return new Promise((res, rej) => {
-      const worker = new Worker('./worker.js', { workerData: { jobId, data } });
+      const worker = new Worker('./worker.mjs', { workerData: { jobId, data } });
       worker.on("message", (data) => {
         data = JSON.parse(data);
         if (data.event == "error") {
@@ -614,6 +623,8 @@ export default class Player extends EventEmitter {
         list += "\nSend the number of the result you'd like to play here in this channel. Example: `2`\nTo cancel this process, just send an 'x'!";
         this.searches.set(id, data.data);
         res({ m: list, count: data.data.length });
+      }).catch(error => {
+        res(error);
       });
     });
   }
