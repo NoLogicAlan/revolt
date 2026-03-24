@@ -443,15 +443,16 @@ export default class Player extends EventEmitter {
     }
 
     const connection = this.voice.getVoiceConnection(this.connection.channelId);
-    let stream;
+    var streamUrl;
     console.log("songData", songData);
     if (songData.type == "external" || songData.type == "radio") {
-      stream = await this.streamResource(songData.url);
+      streamUrl = songData.url;
     } else if (songData.encoded) {
-      stream = await (await this.getNode()).getDirectStream({
+      streamUrl = (await (await this.getNode()).getDirectStream({
         encoded: songData.encoded
-      });
+      })).url;
     }
+    const stream = await this.streamResource(streamUrl);
     console.log("stream", stream);
 
     if (!stream) {

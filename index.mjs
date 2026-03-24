@@ -9,8 +9,6 @@ import YTDlpWrapE from "yt-dlp-wrap-extended";
 import { PlayerManager } from "./src/PlayerManager.mjs";
 import Player from "./src/Player.mjs";
 const YTDlpWrap = YTDlpWrapE.default;
-import { Innertube, Platform } from "youtubei.js";
-import { generate } from "youtube-po-token-generator";
 import childProcess from "node:child_process";
 import { Manager } from "moonlink.js";
 
