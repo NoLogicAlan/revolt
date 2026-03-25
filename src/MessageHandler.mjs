@@ -371,7 +371,7 @@ export class MessageHandler {
     });
     const finish = () => {
       unsubscribe();
-      const lastContent = builder.getContent(page);
+      const lastContent = builder.getPage(page);
       m.editEmbed({
         embedText: lastContent + "\nSession closed - Changing pages **won't work** from here.",
         content: "Session Closed"
