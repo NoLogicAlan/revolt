@@ -80,6 +80,9 @@ export class Utils {
     }
     return result.trim();
   }
+  timestampToMilliseconds(timestamp, format) {
+    // TODO if necessary
+  }
   /**
    * Shuffles an array, should be in-place. Array is returned anyways.
    * @param {any[]} a

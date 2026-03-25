@@ -6,8 +6,6 @@ import Uploader from "revolt-uploader";
 import meta from "./probe.js";
 import { Client } from "revolt.js";
 import { Worker } from "node:worker_threads";
-import { spawn } from "node:child_process";
-import { PassThrough } from "node:stream";
 import https from "node:https";
 import { Manager, Node } from "moonlink.js";
 import path from "node:path";
@@ -164,6 +162,19 @@ export class Queue extends EventEmitter {
   getQueue() {
     return this.data;
   }
+  /**
+   * Sums all the durations of the tracks in the queue
+   * @returns {number}
+   */
+  getDuration() {
+    if (this.data.find(v => v.type === "radio")) return Infinity;
+    return this.data.map(v => {
+      if (typeof v.duration != "object") {
+        return v.duration;
+      }
+      return v.duration.seconds; // timestamp decoding shouldn't be necessary with nodelink anymore
+    }).reduce((a, b) => a + b, 0);
+  }
 }
 
 export default class Player extends EventEmitter {
@@ -301,15 +312,58 @@ export default class Player extends EventEmitter {
     if (code) return vid.title + " (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(vid.duration) + ")" + ((vid.spotifyUrl || vid.url) ? " - " + (vid.spotifyUrl || vid.url) : "");
     return "[" + vid.title + " (" + this.getCurrentElapsedDuration() + "/" + this.getDuration(vid.duration) + ")" + "]" + ((vid.spotifyUrl || vid.url) ? "(" + (vid.spotifyUrl || vid.url) + ")" : "");
   }
+  /**
+   * @typedef ListData
+   * @property {Object} current
+   * @property {string} current.title
+   * @property {string} current.artist
+   * @property {string} current.url
+   * @property {string} current.elapsed
+   * @property {string} current.duration
+   *
+   * @property {Object} totalTime
+   * @property {number} totalTime.time
+   * @property {string} totalTime.timestamp
+   *
+   * @property {Object[]} queue
+   * @property {string} queue[].title
+   * @property {string} queue[].artist
+   * @property {string} queue[].url
+   * @property {string} queue[].duration
+   */
+  /**
+   * @returns {ListData}
+   */
   list() {
-    var text = "";
     const current = this.queue.getCurrent();
-    if (current) text += "[x] " + this.getVideoName(current) + "\n";
-    this.queue.getQueue().forEach((vid, i) => {
-      text += "[" + i + "] " + this.getVideoName(vid) + "\n";
+    const length = this.queue.getDuration();
+    const result = {
+      current: null,
+      queue: [],
+      totalTime: {
+        time: length,
+        timestamp: (length != Infinity) ? Utils.prettifyMS(length * 1000, "d:h:!m:!s") : "--:--"
+      }
+    }
+    if (current) {
+      result.current = {
+        title: current.title,
+        artist: current.author.name,
+        url: (current.type === "radio") ? current.author.url : current.url,
+        elapsed: this.getCurrentElapsedDuration(),
+        duration: (current.type === "radio") ? "??:??" : this.getDuration(current.duration)
+      }
+    }
+
+    result.queue = this.queue.getQueue().map(v => {
+      return {
+        title: v.title,
+        artist: v.author.name,
+        url: (v.type === "radio") ? v.author.url : v.url,
+        duration: (v.type === "radio") ? "??:??" : this.getDuration(v.duration)
+      }
     });
-    if (this.queue.isEmpty() && !current) text += "--- Empty ---";
-    return text;
+    return result;
   }
   async lyrics() {
     const current = this.queue.getCurrent();
