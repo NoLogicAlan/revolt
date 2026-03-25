@@ -58,6 +58,7 @@ export class Queue extends EventEmitter {
     const previous = this.current;
     if (this.songLoop && this.current) return this.current;
     if (this.loop && this.current) this.data.push(this.current);
+    this.current = null;
     if (this.isEmpty()) return null;
     this.current = this.data.shift();
     this.emit("queue", {
@@ -541,6 +542,7 @@ export default class Player extends EventEmitter {
           this.emit("roomfetched", connection.users)
         });
         this.connection.on("state", (state) => {
+          console.log(state);
           if (state == Revoice.State.IDLE && !roomFetched) {
             this.emit("roomfetched", connection.users);
             // TODO: set roomFetched to true?
