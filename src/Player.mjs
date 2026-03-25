@@ -473,7 +473,7 @@ export default class Player extends EventEmitter {
       //node.loadDirectStream(); // TODO: use loadStream to restart from a given timestamp
       streamUrl = (await node.getDirectStream({
         encoded: songData.encoded
-      }))?.url;
+      }, 251))?.url;
     }
     if (!streamUrl) {
       this.emit("stopplay");

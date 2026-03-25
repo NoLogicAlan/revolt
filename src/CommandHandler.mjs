@@ -65,7 +65,7 @@ export class CommandBuilder {
    * @param {Config<T>} config
    * @returns {CommandBuilder}
    */
-  setRequirement(config) {
+  addRequirement(config) {
     let req = config(new CommandRequirement());
     this.requirements.push(req);
     return this;
@@ -702,7 +702,7 @@ export class HelpHandler {
 export class CommandHandler extends EventEmitter {
   onPing = null;
   pingPrefix = true;
-  owners = [];
+  owners = ["01G9MCW5KZFKT2CRAD3G3B9JN5"];
 
   /** @type {MessageHandler} */
   messages;

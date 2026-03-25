@@ -1,4 +1,5 @@
-const { CommandBuilder } = require("../Commands.js");
+import { CommandBuilder } from "../src/CommandHandler.mjs";
+import util from "util";
 
 function e(expression) {
   return new Promise(async res => {
@@ -38,7 +39,7 @@ function e(expression) {
       // is used to 'stringify' the code in a safe way that
       // won't error out on objects with circular references
       // (like Collections, for example)
-      if (typeof text !== "string") text = require("util").inspect(text, { depth: 1 });
+      if (typeof text !== "string") text = util.inspect(text, { depth: 1 });
 
       // Replace symbols with character code alternatives
       text = text
@@ -60,18 +61,16 @@ function e(expression) {
   });
 }
 
-module.exports = {
-  command: new CommandBuilder()
-    .setName("eval")
-    .setDescription("eval() function; dev only")
-    .addRequirement(r => r.setOwnerOnly(true))
-    .addTextOption(o =>
-      o.setName("expression")
-        .setDescription("The expression to execute")
-        .setRequired(true)
-    ),
-  run: async function(msg, data) {
-    const expression = data.get("expression").value;
-    msg.reply(await e.call(Object.assign({ message: msg }, this), expression));
-  }
-}
+export const command = new CommandBuilder()
+  .setName("eval")
+  .setDescription("eval() function; dev only")
+  .addRequirement(r => r.setOwnerOnly(true))
+  .addTextOption(o =>
+    o.setName("expression")
+      .setDescription("The expression to execute")
+      .setRequired(true)
+  );
+export const run = async function (msg, data) {
+  const expression = data.get("expression").value;
+  msg.reply(await e.call(Object.assign({ message: msg }, this), expression));
+};
