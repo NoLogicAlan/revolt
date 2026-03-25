@@ -9,8 +9,9 @@ import { PlayerManager } from "./src/PlayerManager.mjs";
 import Player from "./src/Player.mjs";
 import childProcess from "node:child_process";
 import { Manager } from "moonlink.js";
+import { Dashboard } from "./src/dashboard/Dashboard.mjs";
 
-class Remix {
+export class Remix {
   constructor() {
     const config = JSON.parse(fs.readFileSync("config.json"));
     this.config = config;
@@ -25,6 +26,8 @@ class Remix {
     const settings = new MySqlSettingsManager(config.mysql, "./storage/defaults.json");
     this.settingsMgr = settings;
     this.handler = commands;
+
+    this.dashboard = new Dashboard(this, config.dashboard);
 
     commands.setPrefixManager(new PrefixManager(settings));
     commands.onPing = (msg) => {
