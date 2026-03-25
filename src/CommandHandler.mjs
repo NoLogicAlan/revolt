@@ -1051,6 +1051,10 @@ export class CommandHandler extends EventEmitter {
     return (new Option()).formatInput(i, this.client, m, type);
   }
 
+  /**
+   * @param {CommandBuilder} builder
+   * @returns{CommandBuilder[]}
+   */
   addCommand(builder) {
     this.commandNames.push(...builder.aliases);
     this.commands.push(builder);
@@ -1062,6 +1066,19 @@ export class CommandHandler extends EventEmitter {
     });
 
     return this.commands;
+  }
+  /**
+   * @param {CommandBuilder} command
+   */
+  removeCommand(command) {
+    command.aliases.forEach(a => {
+      const idx = this.commandNames.findIndex(n => n === a);
+      if (idx === -1) return;
+      this.commandNames.splice(idx, 1);
+    });
+    const idx = this.commands.findIndex(c => c.uid == builder.uid);
+    if (idx == -1) return;
+    this.commands.splice(idx, 1);
   }
 }
 
@@ -1141,5 +1158,20 @@ export class CommandLoader {
         this.runnables.set(sub.uid, cData.run);
       });
     }));
+  }
+
+  /**
+   * @todo Not done yet
+   * @param {string} cmd
+   * @param {Message} msg
+   */
+  reload(cmd, msg) {
+    const command = this.commands.commands.find(e => e.aliases.includes(cmd));
+    if (!command) return msg.replyEmbed("Unknown Command");
+
+    command.subcommands.forEach(sub => {
+      this.runnables.delete(sub.uid);
+    });
+    this.commands.removeCommand(command);
   }
 }
