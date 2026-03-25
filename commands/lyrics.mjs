@@ -9,7 +9,7 @@ export const run = async function (message) {
   const p = await this.getPlayer(message);
   if (!p) return;
 
-  const n = message.replyEmbed("Fetching lyrics from genius...");
+  const n = message.replyEmbed("Fetching lyrics...");
 
   var data = await p.lyrics();
   if (!data.provider) return (await n).editEmbed("Couldn't find the lyrics for this song!");

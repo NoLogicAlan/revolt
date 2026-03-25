@@ -12,7 +12,7 @@ export const command = new CommandBuilder()
     o.setName("provider")
       .setDescription("The search result provider (YouTube, YouTube Music or SoundCloud). Default: SoundCloud", "options.search.provider") // same as search provider flag
       .addFlagAliases("p", "u", "use")
-      .addChoices("ytm", "yt", "scld")
+      .addChoices("ytm", "yt", "scld", "spotify")
       .setDefault("ytm")
     , true).addAlias("p");
 export const run = async function(message, data) {

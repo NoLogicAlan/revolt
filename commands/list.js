@@ -10,6 +10,6 @@ module.exports = {
     if (!p) return;
     var messages = p.list().split("\n");
     // TODO: rewrite following line; Ugly as hell
-    this.pagination("Current Queue:\n```\n" + ((messages.length == 1) ? "" : messages[0] + "\n\n") + "$content\n```\nPage $currPage/$maxPage", (messages.length == 1) ? messages : messages.slice(1), message, 6)
+    this.pagination("Current Queue:\n```\n" + ((messages.length == 1) ? "" : messages[0] + "\n\n") + "$content\n```\nPage $currentPage/$maxPage", (messages.length == 1) ? messages : messages.slice(1), message, 6)
   }
 }
