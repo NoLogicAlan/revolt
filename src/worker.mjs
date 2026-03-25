@@ -129,7 +129,7 @@ export class YTUtils extends EventEmitter {
     }
 
     return {
-      data: tracks.slice(0, limit).map(this.trackToVideo)
+      data: tracks.slice(0, limit).map(this.trackToVideo.bind(this))
     };
   }
 
@@ -155,7 +155,7 @@ export class YTUtils extends EventEmitter {
 
     switch (data.loadType) {
       case "playlist":
-        const tracks = (data.data?.tracks ?? []).map(this.trackToVideo);
+        const tracks = (data.data?.tracks ?? []).map(this.trackToVideo.bind(this));
         tracks.forEach(t => {
           t.playlistName = data.data?.info?.name ?? null;
         });
@@ -201,7 +201,7 @@ export class YTUtils extends EventEmitter {
     }
 
     if (data.loadType === "playlist") {
-      const tracks = (data.data?.tracks ?? []).map(this.trackToVideo);
+      const tracks = (data.data?.tracks ?? []).map(this.trackToVideo.bind(this));
       if (tracks.length > 0) {
         this.emit("message", `✅ Added **${tracks.length}** songs to the queue.`);
         return { type: "list", data: tracks };
