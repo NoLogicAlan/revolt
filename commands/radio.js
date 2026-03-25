@@ -18,14 +18,16 @@ module.exports = {
   run: async function(msg, data) {
     if (data.get("station").value === "list") {
       // list all radio stations
-      var m = "Currently available radio stations: \n\n";
-      this.config.radio.forEach(r => {
-        m += "- " + r.detailedName + " (" + r.name + "): \n  - " + r.description.replaceAll("\n", "\n  - ");
-      });
-      m += " \n\nUse the name in the brackets to select that station in the radio command.\n\n";
-      m += "Example: `%radio zamrock`";
 
-      msg.replyEmbed(m);
+      const form = "Currently available radio stations: \n\n"
+        + "$content \n\nUse the name in the brackets to select that station in the radio command.\n\n"
+        + "Example: `%radio zamrock`\n\n"
+        + "Page $currentPage/$maxPage";
+
+      const lines = this.config.radio.map(r => {
+        return "- " + r.detailedName + " (" + r.name + "): \n  - " + r.description.replaceAll("\n", "\n  - ");
+      });
+      this.pagination(form, lines, msg, 3)
       return;
     }
 

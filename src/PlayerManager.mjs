@@ -70,8 +70,8 @@ export class PlayerManager {
         const idx = reactions.findIndex(r => r === e.emoji_id);
         const c = channels[idx];
         this.initPlayer(msg, c.id, (p) => {
-          if (!p.connection.users.find(u => u.id == message.author.id)) {
-            msg.replyEmbed("You don't seem to be connected to <#" + c.id + ">. Did you forget to join?");
+          if (!p.connection.users.find(u => u.id == msg.author.id)) {
+            msg.replyEmbed("You don't seem to be connected to <#" + c.id + ">. Did you forget to join?", true);
           }
           res(c.id);
         });
