@@ -946,7 +946,7 @@ export class CommandHandler extends EventEmitter {
       let valid = o.validateInput(value, this.client, msg.message);
       if (!valid && o.dynamicDefault) {
         value = o.dynamicDefault(this.client, msg);
-        value = o.validateInput(value, this.client, msg.message);
+        valid = o.validateInput(value, this.client, msg.message);
       }
       if (!valid && (o.required || !o.empty(value))) {
         // TODO: improve checking on optional options (whatever that means)

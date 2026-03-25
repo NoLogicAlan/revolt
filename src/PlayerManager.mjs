@@ -133,7 +133,7 @@ export class PlayerManager {
     if (message.channel.type === "Group") cid = message.channel.id;
     if (!cid) cid = this.checkVoiceChannels(message);
     var player = this.playerMap.get(cid);
-    if (!player && cid) {
+    if (!player && cid && promptJoin) {
       player = await (new Promise((res) => {
         this.initPlayer(message, cid, (p) => {
           res(p);
@@ -166,6 +166,7 @@ export class PlayerManager {
     const m = await msg.replyEmbed("Leaving...");
     const left = p.leave();
     p.destroy();
+    this.playerMap.delete(cid);
     m.editEmbed((left) ? `✅ Successfully Left` : `Not connected to any voice channel`);
   }
 

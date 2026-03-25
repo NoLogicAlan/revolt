@@ -13,7 +13,7 @@ export class Utils {
    *                        - `!<templateCharacter>`: forces the value of the template character to be present in the string. If this prefix is not set, empty values will be omitted. Omitting a character will also omit whatever is right next to it, assuming it is the separator. This is lazy but all we need.
    * @returns {string}
    */
-  static prettifyMS(milliseconds, format) {
+  static prettifyMS(milliseconds, format="D H M S") {
     const roundTowardsZero = milliseconds > 0 ? Math.floor : Math.ceil;
 
     const parsed = {
@@ -67,7 +67,7 @@ export class Utils {
           unit = units.seconds;
           break;
       }
-      value = (value < 10) ? "0" + value : "" + value;
+      value = (value < 10) ? "0" + value : "" + value; // TODO: add a way to disable padding
       const addition = value + ((uppercase) ? unit : "");
       if (value === "00" && !force) {
         result = result.slice(0, i) + result.slice(Math.min(i + 2, result.length));
