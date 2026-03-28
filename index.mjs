@@ -27,7 +27,10 @@ export class Remix {
     this.settingsMgr = settings;
     this.handler = commands;
 
-    this.dashboard = new Dashboard(this, config.dashboard);
+    this.dashboard = new Dashboard(this, {
+      mysql: config.mysql,
+      ...config.dashboard,
+    });
 
     commands.setPrefixManager(new PrefixManager(settings));
     commands.onPing = (msg) => {
