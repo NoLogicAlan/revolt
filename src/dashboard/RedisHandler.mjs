@@ -1,6 +1,7 @@
 import { createClient } from "redis";
 
 export class RedisHandler {
+  platform = "stoat";
   /**
    *
    * @param {Object} opts
@@ -23,7 +24,9 @@ export class RedisHandler {
       console.log("[Redis/Subscriber] Connected");
       this.subscriber.subscribe("request", async (m) => {
         const payload = JSON.parse(m);
+        if (payload.platform !== this.platform) return;
         const result = await this.handleRequest(payload.content);
+        console.log("result", result);
         this.send("response", JSON.stringify({
           id: payload.id,
           content: result

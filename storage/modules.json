@@ -2,7 +2,7 @@
   {
     "name": "wb-dashboard",
     "index": "./dashboard/index.js",
-    "enabled": true
+    "enabled": false
   },
   {
     "name": "rbl-stats",

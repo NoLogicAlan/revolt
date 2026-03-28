@@ -220,6 +220,6 @@ export class PlayerManager {
     for (let [k, _v] of this.playerMap) {
       channels.push(k);
     }
-    return k;
+    return channels;
   }
 }
