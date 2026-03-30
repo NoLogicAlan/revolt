@@ -222,4 +222,14 @@ export class PlayerManager {
     }
     return channels;
   }
+  /**
+   * @returns {Player[]}
+   */
+  playerList() {
+    const players = [];
+    for (let [_k, v] of this.playerMap) {
+      players.push(v);
+    }
+    return players;
+  }
 }

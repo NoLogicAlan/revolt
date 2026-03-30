@@ -1,8 +1,10 @@
-import { User } from "revolt.js";
+import { Channel, Server, User, VoiceParticipant } from "revolt.js";
 import { Remix } from "../../index.mjs";
+import Player from "../Player.mjs";
 import { Utils } from "../Utils.mjs";
 import { DatabaseManager } from "./DatabaseManager.mjs";
 import { RedisHandler } from "./RedisHandler.mjs";
+
 
 export class Dashboard {
   enabled = false;
@@ -28,7 +30,7 @@ export class Dashboard {
     this.redis.setRequestHandler(async (data) => {
       switch (data.type) {
         case "fetchPlayers":
-          return this.remix.players.channelList();
+          return this.remix.players.playerList().map(p => Dashboard.convertPlayer(p));
         case "user":
           return Dashboard.convertUser(this.remix.client.users.get(data.key));
       }
@@ -56,6 +58,87 @@ export class Dashboard {
       avatar: {
         url: user.avatarURL || user.defaultAvatarURL
       },
+    }
+  }
+  /**
+   * @typedef {Object} Video
+   * @property {("radio"|"video"|"external")} type
+   * @property {string} title
+   * @property {string} description
+   * @property {string} videoId
+   * @property {string} url
+   * @property {string} [spotifyUrl]
+   * @property {string} artist Used if type === "external"
+   * @property {Object[]} [artists]
+   * @property {string} artists[].name
+   * @property {string} artists[].url
+   * @property {Object} author
+   * @property {string} author.name
+   * @property {string} author.url
+   */
+  /**
+   * @param {Video} vid
+   */
+  static convertVideo(vid) {
+    return {
+      title: vid.title,
+      url: (vid.type === "radio") ? vid.author.url : vid.url,
+      videoId: vid.videoId,
+      type: vid.type,
+      duration: (typeof vid.duration === "object") ? vid.duration.timestamp : Utils.prettifyMS(duration, "h:!m:!s"),
+      description: vid.description,
+      artist: {
+        name: vid.author.name || vid.artist,
+        url: vid.author.url
+      },
+      thumbnail: vid.thumbnail
+    }
+  }
+  /**
+   * @param {Channel} channel
+   */
+  static convertChannel(channel) {
+    return {
+      name: channel.name,
+      displayName: channel.displayName,
+      id: channel.id,
+      icon: channel.iconURL || null,
+      description: channel.description,
+      isVoice: channel.isVoice,
+      voiceParticipants: Array.from(channel.voiceParticipants.values()).map(p => Dashboard.convertUser(p)),
+      mature: channel.mature,
+      serverId: channel.serverId
+    }
+  }
+  /**
+   * @param {Server} server
+   */
+  static convertServer(server) {
+    return {
+      name: server.name,
+      id: server.id,
+      icon: server.iconURL || null,
+      channelIds: Array.from(server.channelIds.values()),
+      description: server.description,
+      ownerId: server.ownerId
+    }
+  }
+  /**
+   *
+   * @param {Player} player
+   */
+  static convertPlayer(player) {
+    const channel = player.client.channels.get(player.connection.channelId);
+    return {
+      loop: (player.queue.loop * 1) + (player.queue.songLoop * 2), // decode using bitwise shifts
+      paused: player.paused,
+      volume: (player.connection?.preferredVolume || 1) * 100,
+      queue: {
+        current: Dashboard.convertVideo(player.queue.current),
+        data: player.queue.data.map(v => Dashboard.convertVideo(v))
+      },
+      channel: (!!player.connection) ? Dashboard.convertChannel(channel) : null,
+      server: (!!player.connection) ? Dashboard.convertServer(channel.server) : null,
     }
   }
   /**

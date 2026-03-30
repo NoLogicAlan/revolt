@@ -213,6 +213,7 @@ export default class Player extends EventEmitter {
     this.upload = opts.uploader || new Uploader(opts.client, true);
     this.innertube = opts.innertube;
     this.ytdlp = opts.ytdlp;
+    this.client = opts.client; // needed for Dashboard
 
     this.nodelink = opts.nodelink;
     this.nodelinkReady = !!opts.nodelink;
