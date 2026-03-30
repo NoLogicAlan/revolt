@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import path from "path";
 import { Client } from "revolt.js"
-import { CommandHandler, CommandLoader, PrefixManager } from "./src/CommandHandler.mjs";
+import { CommandHandler, CommandLoader, HelpHandler, PrefixManager } from "./src/CommandHandler.mjs";
 import { Message, MessageHandler, PageBuilder } from "./src/MessageHandler.mjs";
 import { MySqlSettingsManager } from "./src/Settings.mjs";
 import { Revoice } from "revoice.js";
@@ -10,6 +10,7 @@ import Player from "./src/Player.mjs";
 import childProcess from "node:child_process";
 import { Manager } from "moonlink.js";
 import { Dashboard } from "./src/dashboard/Dashboard.mjs";
+import { categories } from "./src/helpCatalog.mjs";
 
 export class Remix {
   constructor() {
@@ -26,6 +27,12 @@ export class Remix {
     const settings = new MySqlSettingsManager(config.mysql, "./storage/defaults.json");
     this.settingsMgr = settings;
     this.handler = commands;
+
+    const help = new HelpHandler(commands.commands);
+    help.customHelpHandler = (m) => {
+      this.handleHelp(m);
+    }
+    commands.helpHandler = help;
 
     this.dashboard = new Dashboard(this, {
       mysql: config.mysql,
@@ -161,6 +168,36 @@ export class Remix {
       .setForm(form)
       .setMaxLines(linesPerPage);
     this.messages.initPagination(builder, msg);
+  }
+  /**
+   *
+   * @param {Message} msg
+   */
+  handleHelp(msg) {
+    const commands = this.handler.commands.reduce((prev, curr) => {
+      const cat = curr.category || "default";
+      if (!prev[cat]) return prev[cat] = [curr], prev;
+      prev[cat].push(curr);
+      return prev;
+    }, {});
+
+    for (let c in commands) {
+      commands[c] = commands[c].map((c, i) => `${i + 1}. **${c.name}** ${c.description}`);
+    }
+
+    const cats = categories.map(c => {
+      const content = (c.content)
+        ? c.content.map(l => this.handler.format(l, msg.channel.server.id))
+        : commands[c.category];
+      return {
+        reaction: c.reaction,
+        content: new PageBuilder(content)
+          .setMaxLines(8)
+          .setForm(c.form),
+        title: c.title
+      };
+    });
+    this.messages.initCatalog(cats, msg, 0);
   }
 }
 

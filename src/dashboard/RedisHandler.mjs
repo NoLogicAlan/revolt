@@ -26,7 +26,6 @@ export class RedisHandler {
         const payload = JSON.parse(m);
         if (payload.platform !== this.platform) return;
         const result = await this.handleRequest(payload.content);
-        console.log("result", result);
         this.send("response", JSON.stringify({
           id: payload.id,
           content: result
