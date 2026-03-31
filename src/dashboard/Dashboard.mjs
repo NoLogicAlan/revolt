@@ -34,7 +34,11 @@ export class Dashboard {
         case "user":
           return Dashboard.convertUser(this.remix.client.users.get(data.key));
       }
-    })
+    });
+    this.redis.send("info", JSON.stringify({
+      platform: "stoat",
+      type: "connected"
+    }));
   }
   /**
    * @typedef APIUser
@@ -80,6 +84,7 @@ export class Dashboard {
    * @param {Video} vid
    */
   static convertVideo(vid) {
+    if (!vid) return null;
     return {
       title: vid.title,
       url: (vid.type === "radio") ? vid.author.url : vid.url,
@@ -105,7 +110,9 @@ export class Dashboard {
       icon: channel.iconURL || null,
       description: channel.description,
       isVoice: channel.isVoice,
-      voiceParticipants: Array.from(channel.voiceParticipants.values()).map(p => Dashboard.convertUser(p)),
+      voiceParticipants: Array.from(channel.voiceParticipants.values()).map(p => {
+        return Dashboard.convertUser(p.client.users.get(p.userId)); // VoiceParticipant appears to have a client property with a client object
+      }),
       mature: channel.mature,
       serverId: channel.serverId
     }
