@@ -209,17 +209,39 @@ export class PlayerManager {
     });
     p.on("roomfetched", () => {
       // TODO: observe voice users
+      this.dashboard.playerUpdate({
+        type: "init"
+      }, p);
     });
     this.playerMap.set(cid, p);
     message.replyEmbed("Joining Channel...").then(async message => {
       await p.join(cid);
       message.editEmbed(`✅ Successfully joined <#${cid}>`);
-      this.dashboard.playerUpdate({
-        type: "init"
-      }, p);
       cb(p);
 
       // TODO: listen to joining/leaving users
+      p.connection.on("userjoin", (user) => {
+        const u = Dashboard.convertUser(this.commands.client.users.get(user.id));
+        this.dashboard.updatePlayer({
+          type: "join",
+          data: u,
+        }, p);
+        this.dashboard.updateUser({
+          type: "join",
+          data: cid,
+        }, u);
+      });
+      p.connection.on("userleave", (user) => {
+        const u = Dashboard.convertUser(this.commands.client.users.get(user.id));
+        this.dashboard.updatePlayer({
+          type: "leave",
+          data: u,
+        });
+        this.dashboard.updateUser({
+          type: "leave",
+          data: cid,
+        }, u);
+      });
     });
   }
   /**
@@ -237,8 +259,8 @@ export class PlayerManager {
     const startPlayHandler = song => {
       emit("startplay", Dashboard.convertVideo(song));
     }
-    const streamStartPlayHandler = () => {
-      emit("streamStartPlay");
+    const streamStartPlayHandler = (date) => {
+      emit("streamStartPlay", date);
     }
     const stopPlayHandler = () => {
       emit("stopplay");

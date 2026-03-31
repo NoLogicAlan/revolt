@@ -542,7 +542,7 @@ export default class Player extends EventEmitter {
       return false;
     }
 
-    connection.media.once("startplay", () => this.emit("streamStartPlay"));
+    connection.media.once("startplay", () => this.emit("streamStartPlay", Date.now()));
     connection.media.playStream(stream);
     stream.once("data", () => this.startedPlaying = Date.now());
     if (this.connection.preferredVolume) connection.media.setVolume(this.connection.preferredVolume);

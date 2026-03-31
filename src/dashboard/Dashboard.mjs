@@ -172,6 +172,21 @@ export class Dashboard {
     this.redis.send(channel, JSON.stringify(details));
   }
   /**
+   * @param {Object} details
+   * @param {User} user
+   */
+  userUpdate(details, user) {
+    const channel = this.redis.platform + "_users";
+    this.redis.send(channel, JSON.stringify({
+      ...details,
+      user: Dashboard.convertUser(user)
+    }));
+  }
+  updateUser(details, user) {
+    const channel = this.redis.platform + "_user_" + user.id;
+    this.redis.send(channel, JSON.stringify(details));
+  }
+  /**
    *
    * @param {string} user
    * @param {string} code
