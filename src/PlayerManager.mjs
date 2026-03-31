@@ -220,7 +220,8 @@ export class PlayerManager {
       cb(p);
 
       // TODO: listen to joining/leaving users
-      p.connection.on("userjoin", (user) => {
+      p.connection.on("userJoin", (user) => {
+        console.log("join", user);
         const u = Dashboard.convertUser(this.commands.client.users.get(user.id));
         this.dashboard.updatePlayer({
           type: "join",
@@ -236,7 +237,7 @@ export class PlayerManager {
         this.dashboard.updatePlayer({
           type: "leave",
           data: u,
-        });
+        }, p);
         this.dashboard.updateUser({
           type: "leave",
           data: cid,
