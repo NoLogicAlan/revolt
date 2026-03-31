@@ -94,7 +94,7 @@ export class Queue extends EventEmitter {
    * @param {Video} data
    * @param {boolean} [top]
    */
-  add(data, top=false) {
+  add(data, top = false) {
     this.emit("queue", {
       type: "add",
       data: {

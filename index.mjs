@@ -17,6 +17,11 @@ export class Remix {
     const config = JSON.parse(fs.readFileSync("config.json"));
     this.config = config;
 
+    this.dashboard = new Dashboard(this, {
+      mysql: config.mysql,
+      ...config.dashboard,
+    });
+
     const client = new Client({
       ...config["stoat.js"],
     });
@@ -33,11 +38,6 @@ export class Remix {
       this.handleHelp(m);
     }
     commands.helpHandler = help;
-
-    this.dashboard = new Dashboard(this, {
-      mysql: config.mysql,
-      ...config.dashboard,
-    });
 
     commands.setPrefixManager(new PrefixManager(settings));
     commands.onPing = (msg) => {
@@ -102,7 +102,7 @@ export class Remix {
       config,
       nodelink: this.nodelink,
     }
-    this.players = new PlayerManager(this.revoice, settings, commands, {
+    this.players = new PlayerManager(this.revoice, settings, commands, this.dashboard, {
       config: config,
       player: this.playerContext
     });

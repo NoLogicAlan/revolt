@@ -148,6 +148,29 @@ export class Dashboard {
       server: (!!player.connection) ? Dashboard.convertServer(channel.server) : null,
     }
   }
+  update() {
+
+  }
+  /**
+   * Global player update
+   * @param {Object} details
+   * @param {Player} player
+   */
+  playerUpdate(details, player) {
+    const serialised = Dashboard.convertPlayer(player);
+    this.redis.send(this.redis.platform + "_players", JSON.stringify({
+      ...details,
+      player: serialised
+    }));
+  }
+  /**
+   * @param {Object} details
+   * @param {Player} player
+   */
+  updatePlayer(details, player) {
+    const channel = this.redis.platform + "_player_" + player.connection.channelId;
+    this.redis.send(channel, JSON.stringify(details));
+  }
   /**
    *
    * @param {string} user

@@ -3,6 +3,7 @@ import Player from "./Player.mjs";
 import { CommandHandler } from "./CommandHandler.mjs";
 import { Message } from "./MessageHandler.mjs";
 import { SettingsManager } from "./Settings.mjs";
+import { Dashboard } from "./dashboard/Dashboard.mjs";
 
 export class PlayerManager {
   /** @type {Revoice} */
@@ -23,14 +24,16 @@ export class PlayerManager {
    * @param {Revoice} revoice
    * @param {SettingsManager} settings
    * @param {CommandHandler} commands
+   * @param {Dashboard} dashboard
    * @param {Object} config
    * @param {Object} config.config The configuration for the bot. The parsed config.json
    * @param {Object} config.player Any config data that should be passed to new player objects
    */
-  constructor(revoice, settings, commands, config) {
+  constructor(revoice, settings, commands, dashboard, config) {
     this.revoice = revoice;
     this.commands = commands;
     this.settings = settings;
+    this.dashboard = dashboard;
     this.config = config.config;
     this.playerConfig = config.player;
   }
@@ -192,8 +195,13 @@ export class PlayerManager {
       message.channel.sendEmbed("Left channel <#" + cid + "> because of inactivity.");
       p.destroy();
     });
+    const unsubscribe = this.setupEvents(p);
     p.on("leave", () => {
       // TODO: cleanup
+      this.dashboard.playerUpdate({
+        type: "close"
+      }, p);
+      unsubscribe();
     });
     p.on("message", (m) => {
       if (this.settings.getServer(message.channel.server.id).get("songAnnouncements") == "false") return;
@@ -206,10 +214,109 @@ export class PlayerManager {
     message.replyEmbed("Joining Channel...").then(async message => {
       await p.join(cid);
       message.editEmbed(`✅ Successfully joined <#${cid}>`);
+      this.dashboard.playerUpdate({
+        type: "init"
+      }, p);
       cb(p);
 
       // TODO: listen to joining/leaving users
     });
+  }
+  /**
+   * @param {Player} player
+   */
+  setupEvents(player) {
+    const emit = (event, data) => {
+      const payload = {
+        type: event,
+        data: data
+      };
+      console.log("emit", payload);
+      this.dashboard.updatePlayer(payload, player);
+    }
+    const startPlayHandler = song => {
+      emit("startplay", Dashboard.convertVideo(song));
+    }
+    const streamStartPlayHandler = () => {
+      emit("streamStartPlay");
+    }
+    const stopPlayHandler = () => {
+      emit("stopplay");
+    }
+    const volumeHandler = (v) => {
+      emit("volume", v);
+    }
+    const userHandler = (u, type) => {
+      // TODO:
+      //emit("user" + type, this.except(u, "api"));
+    }
+    const playbackHandler = (playing) => {
+      emit((playing) ? "resume" : "pause", {
+        elapsedTime: player.player.seconds * 1000
+      });
+    }
+    const censorSong = (song) => {
+      if (!song) return song;
+      if (song.type !== "radio") return song;
+      song.url = song.author.url;
+      song.duration = {
+        timestamp: "infinite",
+        duration: Infinity
+      }
+      return song;
+    }
+    const queueHandler = (e) => {
+      const serialised = {
+        type: e.type
+      };
+      console.log("queue");
+      switch (e.type) {
+        case "add":
+          serialised.data = {
+            append: e.data.append,
+            data: Dashboard.convertVideo(e.data.data),
+          }
+          break;
+        case "remove":
+          serialised.data = {
+            index: e.data.index,
+            removed: Dashboard.convertVideo(e.data.removed),
+            old: e.data.old.map(v => Dashboard.convertVideo(v)),
+            new: e.data.new.map(v => Dashboard.convertVideo(v))
+          }
+          break;
+        case "shuffle":
+          serialised.data = e.data.map(v => Dashboard.convertVideo(v));
+          break;
+        case "update":
+          serialised.data = {
+            current: Dashboard.convertVideo(e.data.current),
+            old: Dashboard.convertVideo(e.data.old),
+            loop: e.data.loop,
+          }
+          break;
+        default:
+          break;
+      }
+
+      emit("queue", serialised);
+    }
+    player.on("startplay", startPlayHandler);
+    player.on("streamStartPlay", streamStartPlayHandler);
+    player.on("stopplay", stopPlayHandler);
+    player.on("volume", volumeHandler);
+    player.on("userupdate", userHandler);
+    player.on("playback", playbackHandler);
+    player.queue.on("queue", queueHandler);
+    return () => {
+      player.removeListener("startplay", startPlayHandler);
+      player.removeListener("streamStartPlay", streamStartPlayHandler);
+      player.removeListener("stopplay", stopPlayHandler);
+      player.removeListener("volume", volumeHandler);
+      player.removeListener("userupdate", userHandler);
+      player.removeListener("playback", playbackHandler);
+      player.queue.removeListener("queue", queueHandler);
+    };
   }
 
   /**
