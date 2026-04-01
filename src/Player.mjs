@@ -10,6 +10,7 @@ import https from "node:https";
 import { Manager, Node } from "moonlink.js";
 import path from "node:path";
 import axios from "axios";
+import { PassThrough } from "stream";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
