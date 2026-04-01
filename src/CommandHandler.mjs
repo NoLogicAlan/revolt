@@ -649,7 +649,7 @@ export class HelpHandler {
       options += (o.type === "choice") ? " <" + o.choices.join(" | ") + ">" : " '" + o.name + ": " + o.type + "'";
     });
     let o = cmd.options.find(e => e.type === "text");
-    if (o) options += "'" + o.name + ": " + o.type + "'";
+    if (o) options += " '" + o.name + ": " + o.type + "'";
     return options.trim();
   }
   /**

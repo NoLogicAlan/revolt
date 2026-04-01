@@ -484,7 +484,14 @@ export default class Player extends EventEmitter {
   // TODO: potentially touch up the following parts as well
   async streamResource(url) {
     const response = await axios({ method: 'get', url: url, responseType: 'stream' });
-    return response.data;
+    const buffered = new PassThrough({
+      highWaterMark: 10 * 1024 * 1024,
+    });
+    response.data.pipe(buffered);
+    response.data.on("error", (err) => {
+      buffered.destroy(err);
+    });
+    return buffered;
   }
   /**
    *Waits for a NodeLink node to become ready
