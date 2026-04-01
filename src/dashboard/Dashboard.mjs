@@ -93,7 +93,7 @@ export class Dashboard {
       url: (vid.type === "radio") ? vid.author.url : vid.url,
       videoId: vid.videoId,
       type: vid.type,
-      duration: (typeof vid.duration === "object") ? vid.duration.timestamp : Utils.prettifyMS(duration, "h:!m:!s"),
+      duration: (vid.type === "radio") ? "--:--" : ((typeof vid.duration === "object") ? vid.duration.timestamp : Utils.prettifyMS(vid.duration, "h:!m:!s")),
       description: vid.description,
       artist: {
         name: vid.author.name || vid.artist,

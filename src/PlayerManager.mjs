@@ -113,7 +113,7 @@ export class PlayerManager {
    */
   checkVoiceChannels(message) {
     if (!message) return null;
-    const user = message.author.id;
+    const user = message.authorId;
     var id = null;
     message.channel.server.channels.forEach(c => {
       if (!c.isVoice) return;
