@@ -33,7 +33,7 @@ export class Remix {
     this.settingsMgr = settings;
     this.handler = commands;
 
-    const help = new HelpHandler(commands.commands);
+    const help = new HelpHandler(commands);
     help.customHelpHandler = (m) => {
       this.handleHelp(m);
     }

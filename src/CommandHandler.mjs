@@ -529,6 +529,9 @@ export class HelpHandler {
    * @param {Message} msg
    */
   customHelpHandler = null;
+  /**
+   * @param {CommandHandler} commands
+   */
   constructor(commands) {
     this.commands = commands;
   }

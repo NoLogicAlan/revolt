@@ -1,5 +1,6 @@
 import { Channel, Server, User, VoiceParticipant } from "revolt.js";
 import { Remix } from "../../index.mjs";
+import { CommandBuilder, CommandHandler, Option } from "../CommandHandler.mjs";
 import Player from "../Player.mjs";
 import { Utils } from "../Utils.mjs";
 import { DatabaseManager } from "./DatabaseManager.mjs";
@@ -33,6 +34,8 @@ export class Dashboard {
           return this.remix.players.playerList().map(p => Dashboard.convertPlayer(p));
         case "user":
           return Dashboard.convertUser(this.remix.client.users.get(data.key));
+        case "commands":
+          return this.remix.handler.commands.map(c => Dashboard.convertCommand(c, this.remix.handler));
       }
     });
     this.redis.send("info", JSON.stringify({
@@ -146,6 +149,45 @@ export class Dashboard {
       },
       channel: (!!player.connection) ? Dashboard.convertChannel(channel) : null,
       server: (!!player.connection) ? Dashboard.convertServer(channel.server) : null,
+    }
+  }
+  /**
+   * @param {Option} opt
+   */
+  static convertOption(opt) {
+    return {
+      type: opt.type,
+      name: opt.name,
+      choices: opt.choices,
+      description: opt.description,
+      required: opt.required,
+      uid: opt.uid,
+      defaultValue: opt.defaultValue,
+      dynamicDefaultPresent: !!opt.dynamicDefault
+    }
+  }
+  /**
+   *
+   * @param {CommandBuilder} com
+   * @param {CommandHandler} commands
+   * @returns
+   */
+  static convertCommand(com, commands) {
+    return {
+      name: com.name,
+      description: com.description,
+      uid: com.uid,
+      aliases: com.aliases,
+      subcommands: com.subcommands.map(c => Dashboard.convertCommand(c, commands)),
+      category: com.category,
+      examples: com.examples,
+      usage: commands.helpHandler.commandUsage(com, {
+        message: {
+          server: { id: "01FZ62C8WFS3HBEN5QTN8RZRQG" }
+        }
+      }),
+      // TODO: add requirements
+      options: com.options.map(o => Dashboard.convertOption(o)),
     }
   }
   update() {
