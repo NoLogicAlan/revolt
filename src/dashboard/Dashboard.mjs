@@ -200,7 +200,7 @@ export class Dashboard {
    */
   playerUpdate(details, player) {
     const serialised = Dashboard.convertPlayer(player);
-    this.redis.send(this.redis.platform + "_players", JSON.stringify({
+    this.redis.send(this.redis.platform + ":players", JSON.stringify({
       ...details,
       player: serialised
     }));
@@ -210,7 +210,7 @@ export class Dashboard {
    * @param {Player} player
    */
   updatePlayer(details, player) {
-    const channel = this.redis.platform + "_player_" + player.connection.channelId;
+    const channel = this.redis.platform + ":player_" + player.connection.channelId;
     this.redis.send(channel, JSON.stringify(details));
   }
   /**
@@ -218,14 +218,14 @@ export class Dashboard {
    * @param {User} user
    */
   userUpdate(details, user) {
-    const channel = this.redis.platform + "_users";
+    const channel = this.redis.platform + ":users";
     this.redis.send(channel, JSON.stringify({
       ...details,
       user: Dashboard.convertUser(user)
     }));
   }
   updateUser(details, user) {
-    const channel = this.redis.platform + "_user_" + user.id;
+    const channel = this.redis.platform + ":user_" + user.id;
     this.redis.send(channel, JSON.stringify(details));
   }
   /**
