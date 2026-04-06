@@ -34,6 +34,8 @@ export class Dashboard {
           return this.remix.players.playerList().map(p => Dashboard.convertPlayer(p));
         case "user":
           return Dashboard.convertUser(this.remix.client.users.get(data.key));
+        case "sharedServers":
+          return await this.remix.getSharedServers(this.remix.client.users.get(data.key));
         case "commands":
           return this.remix.handler.commands.map(c => Dashboard.convertCommand(c, this.remix.handler));
       }

@@ -130,7 +130,7 @@ export class Remix {
     return this.players.getPlayer(message, promptJoin, verifyUser);
   }
   /**
-   * @param {User[]} users
+   * @param {User} user
    * @returns {Promise<Object[]>}
    */
   getSharedServers(user) {
@@ -151,7 +151,7 @@ export class Remix {
           name: server.name,
           id: server.id,
           icon: icon(),
-          voiceChannels: server.channels.filter(c => c.type == "VoiceChannel").map(c => ({ name: c.name, id: c.id, icon: c.animatedIconURL || c.iconURL || null })) // TODO: fetch users as well
+          voiceChannels: server.channels.filter(c => c.isVoice).map(c => ({ name: c.name, id: c.id, icon: c.animatedIconURL || c.iconURL || null })) // TODO: fetch users as well
         }
       });
       res(servers);
