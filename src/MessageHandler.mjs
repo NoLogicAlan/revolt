@@ -292,6 +292,11 @@ export class MessageHandler {
    */
   async sendEmbed(channel, content, options={}) {
     if (this.checkPermissions(["SendEmbeds", "SendMessage"], channel).length != 0) {
+      const message = content;
+      if (typeof message === "object") {
+        message.content = content.embedText;
+        delete message.embedText
+      }
       return this.sendMessage(channel, message);
     }
     const message = (typeof content === "object") ? content.embedText : content;
@@ -304,6 +309,26 @@ export class MessageHandler {
       }
     }
     return new Message(await channel.sendMessage(embed), this);
+  }
+
+  /**
+   * @param {string} content
+   * @param {User} user
+   * @param {StoatChannel} channel
+   * @returns {Promise<Message>}
+   */
+  async sendEmbedAsUser(content, user, channel) {
+    if (this.checkPermissions(["Masquerade"], channel).length != 0) {
+      const footer = `\n\n###### Requested by <@${user.id}>`;
+      return this.sendEmbed(channel, content + footer);
+    }
+    return this.sendEmbed(channel, {
+      embedText: content,
+      masquerade: {
+        name: user.username,
+        avatar: user.animatedAvatarURL || user.avatarURL || user.defaultAvatarURL
+      }
+    });
   }
 
   /**
@@ -517,6 +542,14 @@ export class Channel {
    */
   sendEmbed(content, embedOptions={}) {
     return this.handler.sendEmbed(this.channel, content, embedOptions);
+  }
+  /**
+   * @param {string} content
+   * @param {User} user
+   * @returns {Promise<Message>}
+   */
+  sendEmbedAsUser(content, user) {
+    return this.handler.sendEmbedAsUser(content, user, this.channel);
   }
 
   /**
