@@ -84,6 +84,19 @@ export class Utils {
     // TODO if necessary
   }
   /**
+   * Checks wether a string is valid JSON
+   * @param {string} str
+   * @returns
+   */
+  static isJSON(str) {
+    try {
+      JSON.parse(str);
+    } catch (_e) {
+      return false;
+    }
+    return true;
+  }
+  /**
    * Shuffles an array, should be in-place. Array is returned anyways.
    * @param {any[]} a
    * @returns {any[]}

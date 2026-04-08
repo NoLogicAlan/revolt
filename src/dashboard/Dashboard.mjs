@@ -36,6 +36,18 @@ export class Dashboard {
           return Dashboard.convertUser(this.remix.client.users.get(data.key));
         case "sharedServers":
           return await this.remix.getSharedServers(this.remix.client.users.get(data.key));
+        case "server":
+          try {
+            await this.remix.client.servers.get(data.key)?.fetchMember(data.accessor);
+            return Dashboard.convertServer(this.remix.client.servers.get(data.key));
+          } catch (e) {
+            if (Utils.isJSON(e)) {
+              if (JSON.parse(e).type === "NotFound") return { error: "Unauthorised." };
+            }
+            const id = Utils.uid();
+            console.log(e, id);
+            return { error: "An error occured. Id: " + id };
+          }
         case "commands":
           return this.remix.handler.commands.map(c => Dashboard.convertCommand(c, this.remix.handler));
       }
@@ -128,7 +140,8 @@ export class Dashboard {
       icon: server.iconURL || null,
       channelIds: Array.from(server.channelIds.values()),
       description: server.description,
-      ownerId: server.ownerId
+      ownerId: server.ownerId,
+      channels: server.channels.map(Dashboard.convertChannel),
     }
   }
   /**
