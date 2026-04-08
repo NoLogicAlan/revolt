@@ -40,10 +40,6 @@ export class Dashboard {
           return this.remix.handler.commands.map(c => Dashboard.convertCommand(c, this.remix.handler));
       }
     });
-    this.redis.send("info", JSON.stringify({
-      platform: "stoat",
-      type: "connected"
-    }));
   }
   /**
    * @typedef APIUser

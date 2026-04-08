@@ -14,6 +14,7 @@ export class RedisHandler {
     });
     this.client.connect().then(() => {
       console.log("[RedisMain] Connected");
+      this.readyMessage();
     });
 
     this.subscriber = this.client.duplicate();
@@ -31,7 +32,19 @@ export class RedisHandler {
           content: result
         }));
       });
+      this.subscriber.subscribe("info", (m) => {
+        const data = JSON.parse(m);
+        if (data.platform !== "backend") return;
+        if (data.type !== "requestConnected") return;
+        this.readyMessage();
+      });
     });
+  }
+  readyMessage() {
+    this.send("info", JSON.stringify({
+      platform: "stoat",
+      type: "connected"
+    }));
   }
   /**
    *
