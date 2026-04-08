@@ -38,8 +38,10 @@ export class Dashboard {
           return await this.remix.getSharedServers(this.remix.client.users.get(data.key));
         case "server":
           try {
-            await this.remix.client.servers.get(data.key)?.fetchMember(data.accessor);
-            return Dashboard.convertServer(this.remix.client.servers.get(data.key));
+            const member = await this.remix.client.servers.get(data.key)?.fetchMember(data.accessor);
+            const server = Dashboard.convertServer(this.remix.client.servers.get(data.key));
+            server.channels.filter(e => member.hasPermission(this.remix.client.channels.get(e.id), "ViewChannel"));
+            return server;
           } catch (e) {
             if (Utils.isJSON(e)) {
               if (JSON.parse(e).type === "NotFound") return { error: "Unauthorised." };
@@ -50,8 +52,45 @@ export class Dashboard {
           }
         case "commands":
           return this.remix.handler.commands.map(c => Dashboard.convertCommand(c, this.remix.handler));
+
+        case "function":
+          return await this.runFunction(data.params);
       }
     });
+  }
+  /**
+   * @param {Object} params
+   * @param {string} params.func
+   * @param {any} params.data
+   * @returns {Promise<any>}
+   */
+  async runFunction(params) {
+    switch (params.func) {
+      case "join":
+        var voiceChannel, textChannel;
+        try {
+          voiceChannel = await this.remix.messages.getOrFetchChannel(params.data.channel);
+          textChannel = await this.remix.messages.getOrFetchChannel(params.data.text);
+        } catch (e) {
+          console.log(e);
+          return { error: "Invalid Channel" };
+        }
+        var user;
+        try {
+          user = await this.remix.client.users.fetch(params.data.user);
+        } catch (e) {
+          console.log(e);
+          return { error: "Invalid User" };
+        }
+        if (this.remix.players.hasPlayer(voiceChannel.id)) return { message: "Already Connected" };
+        const message = await textChannel.sendEmbedAsUser(`[Web] Joining <#${voiceChannel.id}>`, user);
+        this.remix.players.initPlayer(message, textChannel.id);
+        return { message: "Joining" };
+    }
+  }
+
+  sendMessage() {
+
   }
   /**
    * @typedef APIUser

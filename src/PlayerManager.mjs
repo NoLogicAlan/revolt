@@ -172,6 +172,13 @@ export class PlayerManager {
     this.playerMap.delete(cid);
     m.editEmbed((left) ? `✅ Successfully Left` : `Not connected to any voice channel`);
   }
+  /**
+   * @param {string} cid
+   * @returns
+   */
+  hasPlayer(cid) {
+    return this.playerMap.has(cid);
+  }
 
 
   /**
