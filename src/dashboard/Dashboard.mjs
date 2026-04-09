@@ -84,7 +84,7 @@ export class Dashboard {
         }
         if (this.remix.players.hasPlayer(voiceChannel.id)) return { message: "Already Connected" };
         const message = await textChannel.sendEmbedAsUser(`[Web] Joining <#${voiceChannel.id}>`, user);
-        this.remix.players.initPlayer(message, textChannel.id);
+        this.remix.players.initPlayer(message, voiceChannel.id);
         return { message: "Joining" };
     }
   }
