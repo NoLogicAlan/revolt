@@ -86,6 +86,15 @@ export class Dashboard {
         const message = await textChannel.sendEmbedAsUser(`[Web] Joining <#${voiceChannel.id}>`, user);
         this.remix.players.initPlayer(message, voiceChannel.id);
         return { message: "Joining" };
+      case "testConnection":
+        try {
+          const channel = await this.remix.messages.getOrFetchChannel("01GS0SMQ660JH731K29T2C9RM9");
+          await channel.sendEmbed("Connection Test. Time: <t:" + Math.floor(Date.now() / 1000) + ":f>")
+        } catch (e) {
+          console.log("Connection test failed: ", e);
+          return { error: e }
+        }
+        return { success: true }
     }
   }
 
