@@ -92,7 +92,7 @@ export class Dashboard {
           await channel.sendEmbed("Connection Test. Time: <t:" + Math.floor(Date.now() / 1000) + ":f>")
         } catch (e) {
           console.log("Connection test failed: ", e);
-          return { error: e }
+          return { error: e.toString() }
         }
         return { success: true }
     }
@@ -206,6 +206,7 @@ export class Dashboard {
         current: Dashboard.convertVideo(player.queue.current),
         data: player.queue.data.map(v => Dashboard.convertVideo(v))
       },
+      users: player.connection.users.map(u => u.id),
       channel: (!!player.connection) ? Dashboard.convertChannel(channel) : null,
       server: (!!player.connection) ? Dashboard.convertServer(channel.server) : null,
     }
