@@ -172,7 +172,9 @@ export class Dashboard {
       description: channel.description,
       isVoice: channel.isVoice,
       voiceParticipants: Array.from(channel.voiceParticipants.values()).map(p => {
-        return Dashboard.convertUser(p.client.users.get(p.userId)); // VoiceParticipant appears to have a client property with a client object
+        const user = p.client.users.get(p.userId);
+        if (!user) return p.userId;
+        return Dashboard.convertUser(user); // VoiceParticipant appears to have a client property with a client object
       }),
       mature: channel.mature,
       serverId: channel.serverId
