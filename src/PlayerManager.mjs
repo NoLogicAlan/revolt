@@ -201,6 +201,7 @@ export class PlayerManager {
     p.on("autoleave", () => {
       message.channel.sendEmbed("Left channel <#" + cid + "> because of inactivity.");
       p.destroy();
+      this.playerMap.delete(cid);
     });
     const unsubscribe = this.setupEvents(p);
     p.on("leave", () => {
