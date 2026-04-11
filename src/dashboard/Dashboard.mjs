@@ -208,7 +208,7 @@ export class Dashboard {
         current: Dashboard.convertVideo(player.queue.current),
         data: player.queue.data.map(v => Dashboard.convertVideo(v))
       },
-      users: player.connection.users.map(u => u.id),
+      users: player.connection.users?.map(u => u.id), // TODO: investigate how users can be undefined
       channel: (!!player.connection) ? Dashboard.convertChannel(channel) : null,
       server: (!!player.connection) ? Dashboard.convertServer(channel.server) : null,
     }
