@@ -10,6 +10,10 @@ export const run = async function (message) {
   const p = await this.getPlayer(message);
   if (!p) return;
   const data = p.list();
+  data.current ||= {
+    title: "unknown",
+    artist: "unknown"
+  }
   const form = "## Queue\n"
     + "📋 " + data.queue.length + " tracks in queue • ⏰ `" + data.totalTime.timestamp + "`\n\n"
     + "### 🎵 Now Playing\n0. [" + data.current.artist + " - " + data.current.title + "](" + data.current.url + ") `" + data.current.elapsed + " / " + data.current.duration + "`\n\n"
