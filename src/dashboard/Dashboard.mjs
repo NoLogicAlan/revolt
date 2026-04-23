@@ -65,6 +65,15 @@ export class Dashboard {
    * @returns {Promise<any>}
    */
   async runFunction(params) {
+    var user;
+    if (!!params.data.user) {
+      try {
+        user = await this.remix.client.users.fetch(params.data.user);
+      } catch (e) {
+        console.log(e);
+        return { error: "Invalid User" };
+      }
+    }
     switch (params.func) {
       case "join":
         var voiceChannel, textChannel;
@@ -75,17 +84,71 @@ export class Dashboard {
           console.log(e);
           return { error: "Invalid Channel" };
         }
-        var user;
-        try {
-          user = await this.remix.client.users.fetch(params.data.user);
-        } catch (e) {
-          console.log(e);
-          return { error: "Invalid User" };
-        }
+        if (!user) return { error: "Invalid user" };
         if (this.remix.players.hasPlayer(voiceChannel.id)) return { message: "Already Connected" };
         const message = await textChannel.sendEmbedAsUser(`[Web] Joining <#${voiceChannel.id}>`, user);
         this.remix.players.initPlayer(message, voiceChannel.id);
         return { message: "Joining" };
+      case "pausePlayback":
+        var id = params.data.player;
+        var player = this.remix.players.getPlayerFromMap(id);
+        if (!player) return { error: "Player not found" };
+        if (!user) return { error: "Invalid user" };
+        var msg = player.pause();
+        await player.messageChannel.sendEmbedAsUser(msg, user)
+        return { message: msg };
+      case "resumePlayback":
+        var id = params.data.player;
+        var player = this.remix.players.getPlayerFromMap(id);
+        if (!player) return { error: "Player not found" };
+        if (!user) return { error: "Invalid user" };
+        var msg = player.resume();
+        await player.messageChannel.sendEmbedAsUser(msg, user)
+        return { message: msg };
+      case "skip":
+        var id = params.data.player;
+        var player = this.remix.players.getPlayerFromMap(id);
+        if (!player) return { error: "Player not found" };
+        if (!user) return { error: "Invalid user" };
+        var msg = player.skip();
+        await player.messageChannel.sendEmbedAsUser(msg, user)
+        return { message: msg };
+      case "volume":
+        var id = params.data.player;
+        var player = this.remix.players.getPlayerFromMap(id);
+        if (!player) return { error: "Player not found" };
+        if (!user) return { error: "Invalid user" };
+        var msg = player.resume();
+        await player.messageChannel.sendEmbedAsUser(msg, user)
+        return { message: msg };
+      case "addToQueue":
+        var id = params.data.player;
+        var player = this.remix.players.getPlayerFromMap(id);
+        if (!player) return { error: "Player not found" };
+        if (!user) return { error: "Invalid user" };
+        /** @type {"video"|"radio")} */
+        var type = params.data.type;
+        var query = params.data.query;
+        if (type === "radio") {
+          const radio = this.remix.config.radio.find(e => e.name === query);
+          if (!radio) {
+            return { error: "Invalid radio station" };
+          }
+          player.messageChannel.sendEmbedAsUser("Adding radio station to queue...", user).then(m => {
+            player.playRadio(radio);
+            m.editEmbedAsUser(`Added ${radio.detailedName} to the queue`, user);
+          });
+          return { message: "Adding radio station" };
+        }
+        msg = player.play(query);
+        if (!msg) {
+          player.messageChannel.sendEmbedAsUser("Searching...", user).then(m => {
+            msg.on("message", (message) => {
+              m.editEmbedAsUser(message, user);
+            });
+          });
+        }
+        return { message: "Adding to queue" };
       case "testConnection":
         try {
           const channel = await this.remix.messages.getOrFetchChannel("01GS0SMQ660JH731K29T2C9RM9");
