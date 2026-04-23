@@ -179,6 +179,13 @@ export class PlayerManager {
   hasPlayer(cid) {
     return this.playerMap.has(cid);
   }
+  /**
+   * @param {string} cid
+   * @returns
+   */
+  getPlayerFromMap(cid) {
+    return this.playerMap.get(cid);
+  }
 
 
   /**

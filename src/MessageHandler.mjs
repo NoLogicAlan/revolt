@@ -330,6 +330,25 @@ export class MessageHandler {
       }
     });
   }
+  /**
+   *
+   * @param {string} content
+   * @param {User} user
+   * @param {StoatMessage} message
+   */
+  async editEmbedAsUser(content, user, message) {
+    if (this.checkPermissions(["Masquerade"], message.channel).length != 0) {
+      const footer = `\n\n###### Requested by <@${user.id}>`;
+      return this.editEmbed(message, content + footer);
+    }
+    return this.editEmbed(message, {
+      embedText: content,
+      masquerade: {
+        name: user.username,
+        avatar: user.animatedAvatarURL || user.avatarURL || user.defaultAvatarURL
+      }
+    });
+  }
 
   /**
    * @param {StoatMessage} message
@@ -643,6 +662,15 @@ export class Message {
 
   editEmbed(content, embedOptions={}) {
     return this.handler.editEmbed(this.message, content, embedOptions);
+  }
+  /**
+   *
+   * @param {string} content
+   * @param {User} user
+   * @returns
+   */
+  editEmbedAsUser(content, user) {
+    return this.handler.editEmbedAsUser(content, user, this.message);
   }
 }
 

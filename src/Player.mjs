@@ -11,6 +11,7 @@ import { Manager, Node } from "moonlink.js";
 import path from "node:path";
 import axios from "axios";
 import { PassThrough } from "stream";
+import { Channel } from "./MessageHandler.mjs";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
@@ -202,6 +203,7 @@ export default class Player extends EventEmitter {
    * @param {Revoice} opts.voice
    * @param {Client} opts.client
    * @param {Object} opts.config Remix config.json file parsed to an object
+   * @param {Channel} opts.messageChannel
    */
   constructor(token, opts) {
     super();
@@ -215,6 +217,7 @@ export default class Player extends EventEmitter {
     this.innertube = opts.innertube;
     this.ytdlp = opts.ytdlp;
     this.client = opts.client; // needed for Dashboard
+    this.messageChannel = opts.messageChannel;
 
     this.nodelink = opts.nodelink;
     this.nodelinkReady = !!opts.nodelink;
