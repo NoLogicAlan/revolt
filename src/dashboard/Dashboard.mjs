@@ -94,7 +94,7 @@ export class Dashboard {
         var player = this.remix.players.getPlayerFromMap(id);
         if (!player) return { error: "Player not found" };
         if (!user) return { error: "Invalid user" };
-        var msg = player.pause();
+        var msg = player.pause() || "Paused successfully";
         await player.messageChannel.sendEmbedAsUser(msg, user)
         return { message: msg };
       case "resumePlayback":
@@ -102,7 +102,7 @@ export class Dashboard {
         var player = this.remix.players.getPlayerFromMap(id);
         if (!player) return { error: "Player not found" };
         if (!user) return { error: "Invalid user" };
-        var msg = player.resume();
+        var msg = player.resume() || "Resume Successfully";
         await player.messageChannel.sendEmbedAsUser(msg, user)
         return { message: msg };
       case "skip":
@@ -110,7 +110,7 @@ export class Dashboard {
         var player = this.remix.players.getPlayerFromMap(id);
         if (!player) return { error: "Player not found" };
         if (!user) return { error: "Invalid user" };
-        var msg = player.skip();
+        var msg = player.skip() || "Skipped Song";
         await player.messageChannel.sendEmbedAsUser(msg, user)
         return { message: msg };
       case "volume":
@@ -118,7 +118,7 @@ export class Dashboard {
         var player = this.remix.players.getPlayerFromMap(id);
         if (!player) return { error: "Player not found" };
         if (!user) return { error: "Invalid user" };
-        var msg = player.resume();
+        var msg = player.setVolume(params.data.volume);
         await player.messageChannel.sendEmbedAsUser(msg, user)
         return { message: msg };
       case "addToQueue":
