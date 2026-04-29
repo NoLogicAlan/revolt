@@ -92,7 +92,7 @@ export class Remix {
         clientName: "RemixStoat-Main/1.0.0"
       }
     });
-    this.nodelink.init("648200414054842368").then(() => {
+    this.nodelink.init("648200414054842369").then(() => {
       console.log("NodeLink initialised");
     });
 
@@ -114,6 +114,13 @@ export class Remix {
     this.freed = [];
 
     client.loginBot(config.token);
+  }
+  /**
+   * On shut down; Gracefully close voice connections and store player states to reinstate them after the restart.
+   */
+  close() {
+    const players = this.players.close();
+    // TODO:
   }
 
   getSettings(message) {
@@ -215,4 +222,8 @@ process.on("uncaughtException", (err, origin) => {
 process.on("uncaughtExceptionMonitor", (err, origin) => {
   console.log(" [Error_Handling] :: Uncaught Exception/Catch (MONITOR)");
   console.log(err, origin);
+});
+process.on("SIGINT", () => {
+  console.log("SIGINT received, storing current state");
+  remix.close();
 });

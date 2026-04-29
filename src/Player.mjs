@@ -12,6 +12,7 @@ import path from "node:path";
 import axios from "axios";
 import { PassThrough } from "stream";
 import { Channel } from "./MessageHandler.mjs";
+import { Readable, Stream } from "node:stream";
 
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
@@ -164,6 +165,12 @@ export class Queue extends EventEmitter {
   getQueue() {
     return this.data;
   }
+  export() {
+    return {
+      current: structuredClone(this.current),
+      queued: this.data.slice()
+    }
+  }
   /**
    * Sums all the durations of the tracks in the queue
    * @returns {number}
@@ -195,7 +202,7 @@ export default class Player extends EventEmitter {
   LEAVE_TIMEOUT = 45;
   leaving = false;
   searches = new Map();
-  resultLimit = 5; // number of search restults fetched
+  resultLimit = 5; // number of search results fetched
 
   /**
    * @param {string} token
@@ -218,6 +225,8 @@ export default class Player extends EventEmitter {
     this.ytdlp = opts.ytdlp;
     this.client = opts.client; // needed for Dashboard
     this.messageChannel = opts.messageChannel;
+    /** @type {("online"|"stopping"|"offline")} */
+    this.playerStatus = "online";
 
     this.nodelink = opts.nodelink;
     this.nodelinkReady = !!opts.nodelink;
@@ -532,6 +541,7 @@ export default class Player extends EventEmitter {
 
     const connection = this.voice.getVoiceConnection(this.connection.channelId);
     var streamUrl;
+    var directStream;
     if (songData.type == "external" || songData.type == "radio") {
       streamUrl = songData.url;
     } else if (songData.encoded) {
@@ -541,12 +551,19 @@ export default class Player extends EventEmitter {
       streamUrl = (await node.getDirectStream({
         encoded: songData.encoded
       }, 251))?.url;
+      const load = (await node.loadDirectStream({
+        encoded: songData.encoded
+      }, 100, 0));
+      console.log("url ", streamUrl);
+      streamUrl = null;
+      directStream = Stream.Readable.fromWeb(load.stream);
+      console.log(load.stream);
     }
-    if (!streamUrl) {
+    if (!streamUrl && !directStream) {
       this.emit("stopplay");
       return false;
     }
-    const stream = await this.streamResource(streamUrl);
+    const stream = (streamUrl) ? await this.streamResource(streamUrl) : directStream;
 
     if (!stream) {
       this.emit("stopplay");
@@ -583,6 +600,20 @@ export default class Player extends EventEmitter {
   }
   destroy() {
     return this.connection.destroy();
+  }
+  /**
+   * Gracefull shutdown and export for later reinstatement.
+   */
+  close() {
+    this.playerStatus = "stopping";
+    const data = {
+      channel: this.connection.channelId,
+      messagingChannel: this.messageChannel.id,
+      queue: this.queue.export()
+    };
+    this.leave();
+    this.playerStatus = "online";
+    return data;
   }
   preparePlay() {
     if (this.connection.state == Revoice.State.OFFLINE) return "Please let me join first.";

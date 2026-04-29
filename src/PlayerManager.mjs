@@ -18,6 +18,8 @@ export class PlayerManager {
   config;
   /** @type {Object} */
   playerConfig;
+  /** @type {("online"|"stopping"|"offline")} */
+  state = "online";
 
   /**
    *
@@ -129,7 +131,11 @@ export class PlayerManager {
    * @param {boolean} [promptJoin] Defaults to true
    * @returns {Promise<Player>}
    */
-  async getPlayer(message, promptJoin = true, verifyUser=true) {
+  async getPlayer(message, promptJoin = true, verifyUser = true) {
+    if (this.state !== "online") {
+      message.replyEmbed("Shutting down. Please wait a few minutes until you try again. If this happens a lot, please contact an admin.", true);
+      return false;
+    }
     const user = this.revoice.getUser(message.author.id).user;
     var cid = user?.connectedTo;
     // TODO: enable joining dms
@@ -355,6 +361,19 @@ export class PlayerManager {
       player.removeListener("playback", playbackHandler);
       player.queue.removeListener("queue", queueHandler);
     };
+  }
+
+  /**
+   * Instructs the PlayerManager to shut down gracefully, storing the current state of each player and returning those states.
+   */
+  close() {
+    this.state = "stopping";
+
+    const players = this.playerList().filter(p => p.connection.state !== "off").map(p => {
+      return p.close();
+    });
+    this.state = "offline";
+    return players;
   }
 
   /**
