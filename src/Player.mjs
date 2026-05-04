@@ -14,6 +14,30 @@ import { PassThrough } from "stream";
 import { Channel } from "./MessageHandler.mjs";
 import { Readable, Stream } from "node:stream";
 
+/**
+ * @typedef {Object} Video
+ * @property {("radio"|"video"|"external")} type
+ * @property {string} title
+ * @property {string} description
+ * @property {string} videoId
+ * @property {string} url
+ * @property {string} encoded Nodelink encoded identifier
+ * @property {string} [spotifyUrl]
+ * @property {string} artist Used if type === "external"
+ * @property {Object[]} [artists]
+ * @property {string} artists[].name
+ * @property {string} artists[].url
+ * @property {Object} author
+ * @property {string} author.name
+ * @property {string} author.url
+ */
+ /**
+  * @typedef SerialisedVideo
+  * @property {string} encoded NodeLink encoded identifier
+  * @property {string} id videoId, might be redundant/deprecated
+  * @property {number} [restart] Timestamp to restart from
+  */
+
 export class Queue extends EventEmitter {
   /** @type {Video[]} */
   data = [];
@@ -21,23 +45,6 @@ export class Queue extends EventEmitter {
   current = null;
   loop = false;
   songLoop = false;
-
-  /**
-   * @typedef {Object} Video
-   * @property {("radio"|"video"|"external")} type
-   * @property {string} title
-   * @property {string} description
-   * @property {string} videoId
-   * @property {string} url
-   * @property {string} [spotifyUrl]
-   * @property {string} artist Used if type === "external"
-   * @property {Object[]} [artists]
-   * @property {string} artists[].name
-   * @property {string} artists[].url
-   * @property {Object} author
-   * @property {string} author.name
-   * @property {string} author.url
-   */
 
   constructor() {
     super();
@@ -545,24 +552,14 @@ export default class Player extends EventEmitter {
     if (songData.type == "external" || songData.type == "radio") {
       streamUrl = songData.url;
     } else if (songData.encoded) {
-      console.log("songData", songData);
       const node = await this.getNode();
-      //node.loadDirectStream(); // TODO: use loadStream to restart from a given timestamp
-      streamUrl = (await node.getDirectStream({
-        encoded: songData.encoded
-      }, 251))?.url;
       const load = (await node.loadDirectStream({
         encoded: songData.encoded
       }, 100, 0));
-      console.log("url ", streamUrl);
       streamUrl = null;
-      directStream = Stream.Readable.fromWeb(load.stream);
-      console.log(load.stream);
+      directStream = load.stream;
     }
-    if (!streamUrl && !directStream) {
-      this.emit("stopplay");
-      return false;
-    }
+
     const stream = (streamUrl) ? await this.streamResource(streamUrl) : directStream;
 
     if (!stream) {
@@ -571,7 +568,11 @@ export default class Player extends EventEmitter {
     }
 
     connection.media.once("startplay", () => this.emit("streamStartPlay", Date.now()));
-    connection.media.playStream(stream);
+    connection.media.playStream(stream, (!streamUrl) ? [
+            `-f s16le`,
+            `-ar 48000`,
+            `-ac 2`
+          ] : undefined);
     stream.once("data", () => this.startedPlaying = Date.now());
     if (this.connection.preferredVolume) connection.media.setVolume(this.connection.preferredVolume);
     this.announceSong(songData);
@@ -603,6 +604,7 @@ export default class Player extends EventEmitter {
   }
   /**
    * Gracefull shutdown and export for later reinstatement.
+   * @returns {{channel: string, messagingChannel: string, queue:{current: SerialisedVideo, queued: SerialisedVideo[]}}}
    */
   close() {
     this.playerStatus = "stopping";
@@ -611,6 +613,15 @@ export default class Player extends EventEmitter {
       messagingChannel: this.messageChannel.id,
       queue: this.queue.export()
     };
+    data.queue.queued = data.queue.queued.map(e => ({
+      encoded: e.encoded,
+      id: e.videoId
+    }));
+    data.queue.current = (data.queue.current) ? {
+      encoded: data.queue.current.encoded,
+      id: data.queue.current.videoId,
+      restart: Math.max(this.player.seconds * 1000 - 1000, 0) // restart one second earlier
+    } : null;
     this.leave();
     this.playerStatus = "online";
     return data;
