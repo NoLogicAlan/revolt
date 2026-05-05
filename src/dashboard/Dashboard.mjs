@@ -27,6 +27,8 @@ export class Dashboard {
 
     this.db = new DatabaseManager(opts.mysql);
 
+    if (!this.enabled) return this;
+
     this.redis = new RedisHandler(opts.redis);
     this.redis.setRequestHandler(async (data) => {
       switch (data.type) {
@@ -61,12 +63,12 @@ export class Dashboard {
   /**
    * @param {Object} params
    * @param {string} params.func
-   * @param {any} params.data
+   * @param {any} [params.data]
    * @returns {Promise<any>}
    */
   async runFunction(params) {
     var user;
-    if (!!params.data.user) {
+    if (!!params?.data?.user) {
       try {
         user = await this.remix.client.users.fetch(params.data.user);
       } catch (e) {
