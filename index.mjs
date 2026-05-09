@@ -70,7 +70,7 @@ export class Remix {
       console.log("Modules loaded.");
     });
 
-    this.revoice = new Revoice(config.token || config.login, config["revolt-api"]);
+    this.revoice = new Revoice(config.token || config.login, config["stoat-api"] || config["revolt-api"]);
     this.observedVoiceUsers = new Map();
 
     try {

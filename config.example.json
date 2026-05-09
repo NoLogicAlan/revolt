@@ -5,6 +5,7 @@
     "password": "The password to the account"
   },
   "stoat.js": {
+    "Comment": "Configuration data for revolt.js clients; See possible options here: https://revolt.js.org/classes/Client.html#constructor",
     "heartbeatInterval": 30000
   },
   "nodelink": {
@@ -20,7 +21,10 @@
     ]
   },
   "dashboard": {
-    "enabled": false
+    "enabled": false,
+    "redis": {
+      "url": "redis://localhost:6379"
+    }
   },
   "prefix": "your desired prefix (such as %)",
   "presenceInterval": null,
@@ -47,16 +51,6 @@
   "radio": [
 
   ],
-  "cache": {
-    "guilds": {
-      "enabled": true,
-      "max": 5000
-    },
-    "members": {
-      "enabled": true,
-      "max": 10000
-    }
-  },
   "helpCatalog": true,
   "helpPagination": true,
   "mapMembers": true,
@@ -68,22 +62,10 @@
     "database": "name of the target database"
   },
   "rbl": "Your token for revoltbots.org; optional",
-  "webPort": 80,
   "dashboardUrl": "The url the dashboard is accessible with.",
-  "ssl": {
-    "private": "path-to-private-key.pem",
-    "cert": "path-to-certificate.pem",
-    "useSSL": false,
-    "httpPort": 80
-  },
-  "revolt.js": {
-    "Comment": "Configuration data for revolt.js clients; See possible options here: https://revolt.js.org/classes/Client.html#constructor"
-  },
-  "revolt-api": {
+  "stoat-api": {
     "Comment": "Configuration options for a revolt-api client; See the last example here: https://github.com/insertish/oapi#example"
   },
-  "sessionSecret": "secret for the expressjs session middleware; https://www.npmjs.com/package/express-session#user-content-secret",
-  "geniusToken": "Genius access token (Used for lyrics); optional",
   "owners": ["not necessary unless you want to use testing commands", "another user id"],
   "playerAFKTimeout": 60000,
   "Comment": "The above specifies the time in ms after which a player goes inactive; Optional"

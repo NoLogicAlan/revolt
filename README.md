@@ -55,6 +55,9 @@ Firstly, you have to [invite Remix](https://stoat.chat/bot/01FVB28WQ9JHMWK8K7RD0
 
 ## Hosting The Bot
 
+> [!TIP]
+> After finishing the setup, make sure you run `node index.mjs`, **not** `index.js`. index.js will be removed in the future but is currently left in the repo for reference purposes for the duration of the refactor.
+
 If you're self-hosting Remix, please make it clear that it is **not the main instance** (or **change the name**) but give credit by **linking to this repo** (for example, in the bot's profile - something like `This bot <is based on/is an instance of> [Remix](https://github.com/remix-bot/stoat)` will suffice).
 
 -   Clone this repo (`git clone https://github.com/remix-bot/stoat.git)`)
@@ -64,7 +67,16 @@ If you're self-hosting Remix, please make it clear that it is **not the main ins
     - Important: since [
 6cedcb9](https://github.com/remix-bot/stoat/commit/6cedcb9425d65171b79ce73fc91a9e890afc137a), a MySQL database is required.
       For setup instructions see [DB Setup](#setup-database).
--   Run the bot (`node index.js`; for node versions >21.1: `node --no-experimental-global-navigator index.js`)
+-   Set up a [NodeLink](https://github.com/PerformanC/NodeLink) instance:
+    - Follow the instructions in their official repository to install it to a different folder
+    - Create a config.js file in your NodeLink folder and make sure to set `enableTrackStreamEndpoint` and `enableLoadStreamEndpoint` to **true**
+    - Edit your local config.json file and update the connection details to your NodeLink instance(s)
+  - Run the bot with `node index.mjs`
+
+- In case you want to selfhost the dashboard, you will also need additional tables in your MySQL database and a runnning Redis instance. As the dashboard is being completely rewritten right now, installation instructions may not be available for the other components of the system yet. For the latest information, ping `ShadowLp174` on our official servers on Stoat or Fluxer.
+
+> [!WARNING]
+> If you don't enable the trackStream and loadStream endpoints in your NodeLink configuration, apart from radio stations, no audio will be played.
 
 > [!WARNING]
 > For Node versions 21.1.X+ it is important to disable the navigator API. Unless the API is disabled, joining a voice channel will result in a "device not supported" error. It can be disabled with the `--no-experimental-global-navigator` flag when starting the node process. This is hopefully a temporary fix until the dependency is updated.
@@ -81,7 +93,10 @@ If you're self-hosting Remix, please make it clear that it is **not the main ins
     `data` json NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
   ```
-5. You're good to go! If you've used the old settings system and want to migrate your data,
+5. You're good to go!
+
+> [!TIP]
+> If you've used the old settings system and want to migrate your data,
 check the README in the `settings` folder.
 
 
@@ -91,16 +106,6 @@ If you don't want to connect to the official Stoat instance, you need to fill ou
 
 Please refer to the [stoat.js docs](https://stoat.js.org/classes/Client.html#constructor) for `stoat.js` and to [oapi's docs](https://github.com/insertish/oapi#example) for `stoat-api`.
 
-## Updating YTDL-Core
-
-Remix uses ytdl-core to download the music from YouTube. Since the original js package receives updates rarely,
-we're using a more frequently updated/fixed fork by [DistubeJs](https://github.com/distubejs/ytdl-core).
-That means if there are errors during playback, you can try to update ytdl using the following command:
-
-```js
-npm i ytdl-core@npm:@distube/ytdl-core@latest
-```
-
 ## Contact
 
 If you have any questions or would like to talk with other Remix users you can join our Stoat server <a href="https://stt.gg/Remix">here</a>.
@@ -108,9 +113,3 @@ If you have any questions or would like to talk with other Remix users you can j
 ---
 
 &copy; 2026 Remix. All Rights Reserved.
-
-
-
-
-
-
