@@ -55,6 +55,9 @@ Firstly, you have to [invite Remix](https://stoat.chat/bot/01FVB28WQ9JHMWK8K7RD0
 
 ## Hosting The Bot
 
+> [!WARNING]
+> If you experience any instabilities, such as OOM errors, please try to switch to the `refactor` branch. It is a lot more up to date and relies on NodeLink to stream media, making it more stable.
+
 If you're self-hosting Remix, please make it clear that it is **not the main instance** (or **change the name**) but give credit by **linking to this repo** (for example, in the bot's profile - something like `This bot <is based on/is an instance of> [Remix](https://github.com/remix-bot/stoat)` will suffice).
 
 -   Clone this repo (`git clone https://github.com/remix-bot/stoat.git)`)
