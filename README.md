@@ -78,8 +78,8 @@ If you're self-hosting Remix, please make it clear that it is **not the main ins
 > [!WARNING]
 > If you don't enable the trackStream and loadStream endpoints in your NodeLink configuration, apart from radio stations, no audio will be played.
 
-> [!WARNING]
-> For Node versions 21.1.X+ it is important to disable the navigator API. Unless the API is disabled, joining a voice channel will result in a "device not supported" error. It can be disabled with the `--no-experimental-global-navigator` flag when starting the node process. This is hopefully a temporary fix until the dependency is updated.
+> [!NOTE]
+> **This only concerns older versions of Remix and is not necessary anymore**: For Node versions 21.1.X+ it is important to disable the navigator API. Unless the API is disabled, joining a voice channel will result in a "device not supported" error. It can be disabled with the `--no-experimental-global-navigator` flag when starting the node process. This is hopefully a temporary fix until the dependency is updated.
 
 ## Setup Database
 
