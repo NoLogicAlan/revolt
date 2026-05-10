@@ -105,9 +105,13 @@ export class MessageHandler {
    * @param {MessageListener} listener A callback function which will be called with a {@Message} object
    */
   onMessage(listener) {
-    this.client.on("messageCreate", (msg) => {
+    const handler = (msg) => {
       listener(new Message(msg, this));
-    });
+    };
+    this.client.on("messageCreate", handler);
+    return () => {
+      this.client.removeListener("messageCreate", handler);
+    };
   }
 
   /**
@@ -156,14 +160,23 @@ export class MessageHandler {
   }
 
   observeReactions(msg, reactions, cb, user) {
-    this.observedReactions.set(msg.id, {
+    const oid = msg.id;
+    const timeout = setTimeout(() => {
+      this.observedReactions.delete(oid);
+    }, 30 * 60 * 1000); // auto-expire after 30 minutes
+    // Prevent the timer from keeping the process alive
+    if (timeout.unref) timeout.unref();
+    this.observedReactions.set(oid, {
       reactions: reactions,
       user: (user) ? user.id : null,
-      cb
+      cb,
+      _timeout: timeout
     });
-    return msg.id;
+    return oid;
   }
   unobserveReactions(i) {
+    const entry = this.observedReactions.get(i);
+    if (entry?._timeout) clearTimeout(entry._timeout);
     return this.observedReactions.delete(i);
   }
   /**
@@ -172,14 +185,22 @@ export class MessageHandler {
    * @param {MessageListener} callback
    * @returns {string}
    */
-  observeUserMessagesChannel(user, channel, callback) {
+  observeUserMessagesChannel(user, channel, callback, timeoutMs = 5 * 60 * 1000) {
     const current = (this.observedChannels.get(channel.id) || []);
     const nonce = Utils.uid();
-    current.push({
+    const entry = {
       id: user,
       nonce: nonce,
       cb: callback
-    });
+    };
+    // Auto-evict after timeout to prevent indefinite memory accumulation
+    const timeout = setTimeout(() => {
+      const oid = user + ";" + channel.id + ";" + nonce;
+      this.unobserveUserMessagesChannel(oid);
+    }, timeoutMs);
+    if (timeout.unref) timeout.unref();
+    entry._timeout = timeout;
+    current.push(entry);
     this.observedChannels.set(channel.id, current);
     return user + ";" + channel.id + ";" + nonce;
   }
@@ -188,9 +209,11 @@ export class MessageHandler {
     const current = (this.observedChannels.get(channelId) || []);
     const idx = current.findIndex(e => e.id === user && e.nonce === nonce);
     if (idx === -1) return;
-    current.splice(idx);
+    // Clear the auto-eviction timeout
+    if (current[idx]._timeout) clearTimeout(current[idx]._timeout);
+    current.splice(idx, 1);
     if (current.length === 0) return this.observedChannels.delete(channelId);
-    this.observedChannels.set(current, current);
+    this.observedChannels.set(channelId, current);
   }
 
   #masquerade(channel) {
@@ -486,9 +509,9 @@ export class MessageHandler {
       m.editEmbed({
         embedText: builders[currCat].getPage(currPage) + "\nSession closed - Changing pages **won't work** from here.",
         content: "Session Closed"
-      }), {
+      }, {
         colour: "red"
-      };
+      });
     }
   }
 

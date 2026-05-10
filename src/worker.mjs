@@ -15,15 +15,27 @@ export class YTUtils extends EventEmitter {
     const configPath = path.join(__dirname, "../config.json")
     const config = JSON.parse(fs.readFileSync(configPath));
 
+    // NOTE: Each worker creates its own NodeLink Manager, which opens separate
+    // WebSocket connections. This is necessary because workers run in isolated
+    // threads and cannot share the main thread's Manager instance. Workers are
+    // short-lived (60s max timeout in Player.mjs), so these connections are
+    // ephemeral and cleaned up when the worker exits.
     this.nodelink = new Manager({
       nodes: config.nodelink.nodes,
-      options: {
+      config: {
         clientName: "RemixStoat-Worker/1.0.0"
       }
     });
 
     this.ready = false;
+    this._initTimeout = setTimeout(() => {
+      if (!this.ready) {
+        console.error("[Worker] NodeLink init timed out after 15 seconds");
+        this.emit("ready"); // proceed anyway; getNode() will handle missing nodes
+      }
+    }, 15000);
     this.nodelink.init("648200414054842368").then(() => {
+      clearTimeout(this._initTimeout);
       this.emit("ready");
       this.ready = true;
     });
@@ -45,11 +57,17 @@ export class YTUtils extends EventEmitter {
     const node = this.nodelink.nodes.findNode();
     if (node) return node;
 
-    return new Promise((res) => {
-      this.nodelink.once("nodeReady", () => {
+    return new Promise((res, rej) => {
+      const timeout = setTimeout(() => {
+        this.nodelink.removeListener("nodeReady", onReady);
+        rej(new Error("NodeLink node not ready after 15 seconds in worker"));
+      }, 15000);
+      const onReady = () => {
+        clearTimeout(timeout);
         res(this.nodelink.nodes.findNode());
-      });
-    })
+      };
+      this.nodelink.once("nodeReady", onReady);
+    });
   }
 
   /**
@@ -165,10 +183,13 @@ export class YTUtils extends EventEmitter {
         var video = this.trackToVideo(data.data);
         this.emit("message", `✅ Added [${video.title}](${video.url}) to the queue.`);
         return { type: "video", data: video };
-      case "search" && !!data.data:
-        var video = this.trackToVideo(data.data[0]);
-        this.emit("message", `✅ Added [${video.title}](${video.url}) to the queue.`);
-        return { type: "video", data: video };
+      case "search":
+        if (data.data && data.data.length > 0) {
+          var video = this.trackToVideo(data.data[0]);
+          this.emit("message", `✅ Added [${video.title}](${video.url}) to the queue.`);
+          return { type: "video", data: video };
+        }
+        break;
     }
 
     console.log("Worker exception for url: " + url, data);
@@ -250,28 +271,32 @@ const post = (event, data) => {
   }
 
   var r = null;
-  switch (jobId) {
-    case "search":
-      let result = await utils.getVideoData(data.query, "ytm");
-      post("finished", result);
-      break;
-    case "generalQuery":
-      r = await utils.getVideoData(data.query, data.provider);
-      post("finished", r);
-      break;
-    case "searchResults":
-      r = await utils.getResults(data.query, data.resultCount, data.provider);
-      post("finished", r);
-      break;
-    default:
-      console.log("Invalid jobId");
-      process.exit(0);
-  }
-  process.exit(1);
-})().catch(e => {
-  console.log("[Worker] Error: ", e);
   try {
-    post("error", e?.message ?? String(e))
-  } catch (_) { }
-  process.exit(1);
-});
+    switch (jobId) {
+      case "search":
+        let result = await utils.getVideoData(data.query, "ytm");
+        post("finished", result);
+        break;
+      case "generalQuery":
+        r = await utils.getVideoData(data.query, data.provider);
+        post("finished", r);
+        break;
+      case "searchResults":
+        r = await utils.getResults(data.query, data.resultCount, data.provider);
+        post("finished", r);
+        break;
+      default:
+        console.log("Invalid jobId");
+        process.exit(0);
+    }
+  } catch (e) {
+    console.log("[Worker] Error: ", e);
+    try {
+      post("error", e?.message ?? String(e))
+    } catch (_) { }
+  } finally {
+    // Clean up NodeLink manager connections before exiting
+    if (utils.nodelink?.destroy) utils.nodelink.destroy();
+    process.exit(0);
+  }
+})();

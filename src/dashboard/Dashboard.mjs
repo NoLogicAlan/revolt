@@ -42,7 +42,7 @@ export class Dashboard {
           try {
             const member = await this.remix.client.servers.get(data.key)?.fetchMember(data.accessor);
             const server = Dashboard.convertServer(this.remix.client.servers.get(data.key));
-            server.channels.filter(e => member.hasPermission(this.remix.client.channels.get(e.id), "ViewChannel"));
+            server.channels = server.channels.filter(e => member.hasPermission(this.remix.client.channels.get(e.id), "ViewChannel"));
             return server;
           } catch (e) {
             if (Utils.isJSON(e)) {
@@ -143,10 +143,12 @@ export class Dashboard {
           return { message: "Adding radio station" };
         }
         msg = player.play(query);
-        if (!msg) {
+        if (msg && typeof msg.on === "function") {
           player.messageChannel.sendEmbedAsUser("Searching...", user).then(m => {
             msg.on("message", (message) => {
               m.editEmbedAsUser(message, user);
+              // Clean up after first message to prevent listener leak
+              msg.removeAllListeners();
             });
           });
         }
@@ -326,6 +328,7 @@ export class Dashboard {
    * @param {Player} player
    */
   playerUpdate(details, player) {
+    if (!this.enabled || !this.redis) return;
     const serialised = Dashboard.convertPlayer(player);
     this.redis.send(this.redis.platform + ":players", JSON.stringify({
       ...details,
@@ -337,6 +340,7 @@ export class Dashboard {
    * @param {Player} player
    */
   updatePlayer(details, player) {
+    if (!this.enabled || !this.redis) return;
     const channel = this.redis.platform + ":player_" + player.connection.channelId;
     this.redis.send(channel, JSON.stringify(details));
   }
@@ -345,6 +349,7 @@ export class Dashboard {
    * @param {User} user
    */
   userUpdate(details, user) {
+    if (!this.enabled || !this.redis) return;
     const channel = this.redis.platform + ":users";
     this.redis.send(channel, JSON.stringify({
       ...details,
@@ -352,6 +357,7 @@ export class Dashboard {
     }));
   }
   updateUser(details, user) {
+    if (!this.enabled || !this.redis) return;
     const channel = this.redis.platform + ":user_" + user.id;
     this.redis.send(channel, JSON.stringify(details));
   }
@@ -374,7 +380,7 @@ export class Dashboard {
     if (res.length === 0) return "If this is a valid code, it was not created for your account.";
     for (let i = 0; i < res.length; i++) {
       if ((await this.db.compareHash(code, res[i].token))) {
-        if (Date.now() - this.expiryTime > (new Date(res[i].createdAt)).getTime()) return res("Login token expired");
+        if (Date.now() - this.expiryTime > (new Date(res[i].createdAt)).getTime()) return "Login token expired";
         await this.db.execute("UPDATE login_codes SET verified=true WHERE id=?", [res[i].id]);
         return null;
       }

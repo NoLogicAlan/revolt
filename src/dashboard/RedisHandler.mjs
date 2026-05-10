@@ -24,16 +24,36 @@ export class RedisHandler {
     this.subscriber.connect().then(() => {
       console.log("[Redis/Subscriber] Connected");
       this.subscriber.subscribe("request", async (m) => {
-        const payload = JSON.parse(m);
+        let payload;
+        try {
+          payload = JSON.parse(m);
+        } catch (e) {
+          console.log("[Redis/Subscriber] Invalid JSON in request:", e.message);
+          return;
+        }
         if (payload.platform !== this.platform) return;
-        const result = await this.handleRequest(payload.content);
-        this.send("response", JSON.stringify({
-          id: payload.id,
-          content: result
-        }));
+        try {
+          const result = await this.handleRequest(payload.content);
+          this.send("response", JSON.stringify({
+            id: payload.id,
+            content: result
+          }));
+        } catch (e) {
+          console.error("[Redis/Subscriber] Error handling request:", e);
+          this.send("response", JSON.stringify({
+            id: payload.id,
+            content: { error: "Internal server error" }
+          }));
+        }
       });
       this.subscriber.subscribe("info", (m) => {
-        const data = JSON.parse(m);
+        let data;
+        try {
+          data = JSON.parse(m);
+        } catch (e) {
+          console.log("[Redis/Subscriber] Invalid JSON in info:", e.message);
+          return;
+        }
         if (data.platform !== "backend") return;
         if (data.type !== "requestConnected") return;
         this.readyMessage();
@@ -68,5 +88,9 @@ export class RedisHandler {
    */
   setRequestHandler(handler) {
     this.handleRequest = handler;
+  }
+  close() {
+    if (this.client) this.client.disconnect();
+    if (this.subscriber) this.subscriber.disconnect();
   }
 }

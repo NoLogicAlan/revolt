@@ -56,7 +56,7 @@ export class PlayerManager {
         });
       }
       const channels = msg.channel.server.channels.filter(c => c.isVoice);
-      const reactions = ["🥇", "🥈", "🥉", "🥇", "🥈", "🥉", "🥇", "🥈", "🥉",];//[":one:",":two:",":three:",":four:",":five:",":six:",":seven:",":eight:",":nine:"];
+      const reactions = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
       if (channels.length != 0) {
         var channelSelection = "Please select one of the following channels by clicking on the reactions below\n\n";
         channels.slice(0, 9).forEach((c, i) => {
@@ -211,29 +211,41 @@ export class PlayerManager {
       ...this.playerConfig,
       messageChannel: message.channel
     });
-    p.on("autoleave", () => {
+    const autoleaveHandler = () => {
       message.channel.sendEmbed("Left channel <#" + cid + "> because of inactivity.");
+      cleanupPlayer();
       p.destroy();
       this.playerMap.delete(cid);
-    });
+    };
     const unsubscribe = this.setupEvents(p);
-    p.on("leave", () => {
-      // TODO: cleanup
+    const leaveHandler = () => {
       this.dashboard.playerUpdate({
         type: "close"
       }, p);
-      unsubscribe();
-    });
-    p.on("message", (m) => {
+      cleanupPlayer();
+    };
+    const messageHandler = (m) => {
       if (this.settings.getServer(message.channel.server.id).get("songAnnouncements") == "false") return;
       message.channel.sendEmbed(m);
-    });
-    p.on("roomfetched", () => {
-      // TODO: observe voice users
+    };
+    const roomfetchedHandler = () => {
       this.dashboard.playerUpdate({
         type: "init"
       }, p);
-    });
+    };
+    const cleanupPlayer = () => {
+      unsubscribe();
+      p.connection.removeAllListeners("userJoin");
+      p.connection.removeAllListeners("userleave");
+      p.removeListener("autoleave", autoleaveHandler);
+      p.removeListener("leave", leaveHandler);
+      p.removeListener("message", messageHandler);
+      p.removeListener("roomfetched", roomfetchedHandler);
+    };
+    p.on("autoleave", autoleaveHandler);
+    p.on("leave", leaveHandler);
+    p.on("message", messageHandler);
+    p.on("roomfetched", roomfetchedHandler);
     this.playerMap.set(cid, p);
     message.replyEmbed("Joining Channel...").then(async message => {
       await p.join(cid);
@@ -369,9 +381,10 @@ export class PlayerManager {
   close() {
     this.state = "stopping";
 
-    const players = this.playerList().filter(p => p.connection.state !== "off").map(p => {
+    const players = this.playerList().filter(p => p.connection.state !== Revoice.State.OFFLINE).map(p => {
       return p.close();
     });
+    this.playerMap.clear();
     this.state = "offline";
     return players;
   }

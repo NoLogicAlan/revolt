@@ -138,15 +138,19 @@ export class MySqlSettingsManager extends SettingsManager {
     });
   }
 
+  _loadRetryTimer = null;
+
   async load() {
     const res = await this.query("SELECT * FROM settings");
     if (res.error) {
       console.error("settings init error; ", res.error);
       console.error("retrying in 2 seconds");
-      return setTimeout(() => {
+      this._loadRetryTimer = setTimeout(() => {
         this.load();
       }, 2000);
+      return;
     }
+    this._loadRetryTimer = null;
 
     const results = res.results;
     results.forEach((r) => {
@@ -159,11 +163,20 @@ export class MySqlSettingsManager extends SettingsManager {
     this.emit("ready");
   }
   async remoteUpdate(server, key) {
-    const r = await this.query("UPDATE settings SET data = JSON_SET(data, '$." + key + "', '" + server.data[key] + "') WHERE id='" + server.id + "'")
+    // Validate key to prevent SQL injection - only allow alphanumeric and underscore
+    if (!/^[a-zA-Z0-9_]+$/.test(key)) {
+      console.error("settings update error; invalid key: ", key);
+      return;
+    }
+    const escapedValue = this.db.escape(String(server.data[key]));
+    const escapedId = this.db.escape(server.id);
+    const r = await this.query("UPDATE settings SET data = JSON_SET(data, '$." + key + "', " + escapedValue + ") WHERE id=" + escapedId)
     if (r.error) console.error("settings update error; ", r.error);
   }
   async remoteSave(server) {
-    const r = await this.query("UPDATE settings SET data = '" + JSON.stringify(server.data) + "' WHERE id='" + server.id + "'");
+    const escapedData = this.db.escape(JSON.stringify(server.data));
+    const escapedId = this.db.escape(server.id);
+    const r = await this.query("UPDATE settings SET data = " + escapedData + " WHERE id=" + escapedId);
     if (r.error) console.error("settings server save error; ", r.error);
   }
 
@@ -186,7 +199,9 @@ export class MySqlSettingsManager extends SettingsManager {
     });
   }
   async create(id, server) {
-    const r = await this.query("INSERT INTO settings (id, data) VALUES ('" + id + "', '" + JSON.stringify(server.data) +  "')");
+    const escapedId = this.db.escape(id);
+    const escapedData = this.db.escape(JSON.stringify(server.data));
+    const r = await this.query("INSERT INTO settings (id, data) VALUES (" + escapedId + ", " + escapedData + ")");
     if (r.error) console.error("settings create server error; ", r.error);
   }
 
@@ -207,6 +222,23 @@ export class MySqlSettingsManager extends SettingsManager {
     return this.guilds.has(id);
   }
   getServer(id) {
-    return (!this.guilds.has(id)) ? new ServerSettings(id, this) : this.guilds.get(id);
+    if (!this.guilds.has(id)) {
+      const server = new ServerSettings(id, this);
+      this.guilds.set(id, server);
+      this.create(id, server);
+    }
+    return this.guilds.get(id);
+  }
+  deleteServer(id) {
+    this.guilds.delete(id);
+  }
+  close() {
+    if (this._loadRetryTimer) {
+      clearTimeout(this._loadRetryTimer);
+      this._loadRetryTimer = null;
+    }
+    if (this.db) {
+      this.db.end();
+    }
   }
 }

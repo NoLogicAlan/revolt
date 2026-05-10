@@ -4,6 +4,7 @@ import { Message, MessageHandler, PageBuilder } from "./MessageHandler.mjs";
 import { Channel, Client, Message as StoatMessage, User } from "revolt.js";
 import { SettingsManager } from "./Settings.mjs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import * as fs from "node:fs";
 
 export class CommandBuilder {
@@ -1079,7 +1080,7 @@ export class CommandHandler extends EventEmitter {
       if (idx === -1) return;
       this.commandNames.splice(idx, 1);
     });
-    const idx = this.commands.findIndex(c => c.uid == builder.uid);
+    const idx = this.commands.findIndex(c => c.uid == command.uid);
     if (idx == -1) return;
     this.commands.splice(idx, 1);
   }
@@ -1146,10 +1147,11 @@ export class CommandLoader {
    * @returns {Promise<undefined>}
    */
   loadFromDir(dir) {
-    const files = fs.readdirSync(dir).filter(f => !f.startsWith(".") && (f.endsWith(".js") || f.endsWith(".mjs")));
+    const files = fs.readdirSync(dir).filter(f => !f.startsWith(".") && f.endsWith(".mjs"));
     return Promise.all(files.map(async commandFile => {
       const file = path.join(dir, commandFile);
-      const cData = this.canonData(await import(file));
+      // Use pathToFileURL for cross-platform ESM compatibility (Windows requires file:// URLs)
+      const cData = this.canonData(await import(pathToFileURL(file).href));
       const builder = (typeof cData.command === "function") ? cData.command.call(this.context) : cData.command;
       if (!builder) return console.warn("No builder returned. Skipping '" + commandFile + "'");
       if (cData.export) this.context[cData.export.name] = cData.export.object;

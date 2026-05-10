@@ -23,6 +23,8 @@ export const run = async function(message, data) {
     const messages = p.play(query, false, data.get("provider").value);
     messages.on("message", (d) => {
       msg.editEmbed(d);
+      // Clean up after the first message (play result)
+      messages.removeAllListeners();
     });
   });
 }

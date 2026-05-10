@@ -3,11 +3,11 @@ import { EventEmitter } from "node:events";
 import VoiceImport from "revoice.js";
 const { MediaPlayer, Revoice } = VoiceImport;
 import Uploader from "revolt-uploader";
-import meta from "./probe.js";
+import meta from "./probe.mjs";
 import { Client } from "revolt.js";
 import { Worker } from "node:worker_threads";
 import https from "node:https";
-import { Manager, Node } from "moonlink.js";
+// Manager and Node types are no longer imported - shared Manager is passed via opts
 import path from "node:path";
 import axios from "axios";
 import { PassThrough } from "stream";
@@ -113,7 +113,7 @@ export class Queue extends EventEmitter {
       }
     });
     if (!top) return this.data.push(data);
-    return this.data.queue.unshift(data);
+    return this.data.unshift(data);
   }
   clear() {
     this.data.length = 0;
@@ -209,6 +209,7 @@ export default class Player extends EventEmitter {
   LEAVE_TIMEOUT = 45;
   leaving = false;
   searches = new Map();
+  _searchTimeouts = new Set();
   resultLimit = 5; // number of search results fetched
 
   /**
@@ -235,39 +236,46 @@ export default class Player extends EventEmitter {
     /** @type {("online"|"stopping"|"offline")} */
     this.playerStatus = "online";
 
-    this.nodelink = opts.nodelink;
-    this.nodelinkReady = !!opts.nodelink;
-    if (!this.nodelink) {
-      this.nodelink = new Manager({
-        nodes: opts.config.nodelink.nodes,
-        config: {
-          clientName: "RemixStoat-Player/1.0.0"
-        }
-      });
-      this.nodelink.on("nodeReady", () => {
-        this.nodelinkReady = true;
-        this.emit("nodeReady");
-      });
-      this.nodelink.init("648200414054842368");
+    if (!opts.nodelink) {
+      throw new Error("Player requires a shared NodeLink Manager instance to avoid duplicate WebSocket connections.");
     }
+    this.nodelink = opts.nodelink;
+    this.nodelinkReady = true; // shared manager is already initialised
   }
 
   workerJob(jobId, data, onMessage = null, msg = null) {
     const __dirname = import.meta.dirname;
     return new Promise((res, rej) => {
+      let settled = false;
       const worker = new Worker(path.join(__dirname, './worker.mjs'), { workerData: { jobId, data } });
+      const workerTimeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        worker.terminate();
+        rej(new Error("Worker timed out after 60 seconds"));
+      }, 60000);
       worker.on("message", (data) => {
+        if (settled) return;
         data = JSON.parse(data);
         if (data.event == "error") {
+          settled = true;
+          clearTimeout(workerTimeout);
           rej(data.data);
         } else if (data.event == "message" && (msg || onMessage)) {
           if (msg) this.updateHandler(data.data, msg);
           if (onMessage) onMessage(data.data);
         } else if (data.event == "finished") {
+          settled = true;
+          clearTimeout(workerTimeout);
           res(data.data);
         }
       });
-      worker.on("exit", (code) => { if (code == 0) rej(code) });
+      worker.on("exit", (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(workerTimeout);
+        rej(new Error("Worker exited with code " + code));
+      });
     });
   }
 
@@ -414,7 +422,7 @@ export default class Player extends EventEmitter {
     if (!index && index != 0) throw "Index can't be empty";
     const oldSize = this.queue.size();
     const msg = this.queue.remove(index);
-    if (oldSize != this.queue.size()) this.emit("udpate", "queue");
+    if (oldSize != this.queue.size()) this.emit("update", "queue");
     return msg;
   }
   async nowPlaying() {
@@ -435,21 +443,31 @@ export default class Player extends EventEmitter {
   }
   uploadThumbnail() {
     return new Promise((res) => {
-      //return res();
       const current = this.queue.getCurrent();
       if (!current) return res(null);
       if (!current.thumbnail) return res(null);
-      https.get(current.thumbnail, async (response) => {
-        res(await this.upload.upload(response, current.title));
+      const req = https.get(current.thumbnail, { timeout: 10000 }, async (response) => {
+        try {
+          res(await this.upload.upload(response, current.title));
+        } catch (e) {
+          res(null);
+        }
+      });
+      req.on("error", () => res(null));
+      req.on("timeout", () => {
+        req.destroy();
+        res(null);
       });
     });
   }
   getThumbnail() {
-    return new Promise(async (res) => {
-      const current = this.queue.getCurrent();
-      if (!current) return res({ msg: "There's nothing playing at the moment.", image: null });
-      if (!current.thumbnail) return res({ msg: "The current media resource doesn't have a thumbnail.", image: null });
-      res({ msg: `The thumbnail of the video [${current.title}](${current.url}): `, image: await this.uploadThumbnail() });
+    const current = this.queue.getCurrent();
+    if (!current) return Promise.resolve({ msg: "There's nothing playing at the moment.", image: null });
+    if (!current.thumbnail) return Promise.resolve({ msg: "The current media resource doesn't have a thumbnail.", image: null });
+    return this.uploadThumbnail().then(image => {
+      return { msg: `The thumbnail of the video [${current.title}](${current.url}): `, image };
+    }).catch(() => {
+      return { msg: `The thumbnail of the video [${current.title}](${current.url}): `, image: null };
     });
   }
   /**
@@ -502,6 +520,16 @@ export default class Player extends EventEmitter {
 
   // functional core
   // TODO: potentially touch up the following parts as well
+  /** @type {PassThrough|null} */
+  _currentStream = null;
+
+  _cleanupCurrentStream() {
+    if (this._currentStream && !this._currentStream.destroyed) {
+      this._currentStream.destroy();
+    }
+    this._currentStream = null;
+  }
+
   async streamResource(url) {
     const response = await axios({ method: 'get', url: url, responseType: 'stream' });
     const buffered = new PassThrough({
@@ -511,6 +539,10 @@ export default class Player extends EventEmitter {
     response.data.on("error", (err) => {
       buffered.destroy(err);
     });
+    buffered.on("close", () => {
+      if (!response.data.destroyed) response.data.destroy();
+    });
+    this._currentStream = buffered;
     return buffered;
   }
   /**
@@ -532,10 +564,16 @@ export default class Player extends EventEmitter {
     const node = this.nodelink.nodes.findNode();
     if (node) return node;
 
-    return new Promise((res) => {
-      this.nodelink.once("nodeReady", () => {
+    return new Promise((res, rej) => {
+      const timeout = setTimeout(() => {
+        this.nodelink.removeListener("nodeReady", onReady);
+        rej(new Error("NodeLink node not ready after 30 seconds"));
+      }, 30000);
+      const onReady = () => {
+        clearTimeout(timeout);
         res(this.nodelink.nodes.findNode());
-      });
+      };
+      this.nodelink.once("nodeReady", onReady);
     });
   }
 
@@ -560,6 +598,7 @@ export default class Player extends EventEmitter {
       directStream = load.stream;
     }
 
+    this._cleanupCurrentStream();
     const stream = (streamUrl) ? await this.streamResource(streamUrl) : directStream;
 
     if (!stream) {
@@ -588,9 +627,22 @@ export default class Player extends EventEmitter {
         const channelKey = this.connection.channelId;
         this.connection.state = Revoice.State.OFFLINE;
         this.leaving = true;
+        this.connection.removeAllListeners("state");
+        this.connection.removeAllListeners("roomfetched");
+        this.connection.removeAllListeners("userJoin");
+        this.connection.removeAllListeners("userleave");
+        this.searches.clear();
+        for (const t of this._searchTimeouts) clearTimeout(t);
+        this._searchTimeouts.clear();
+        this._cleanupCurrentStream();
+        // Stop the MediaPlayer if it's playing
+        if (this.player) {
+          try { this.player.stop(); } catch (_) {}
+        }
         this.connection.leave();
         this.voice.connections.delete(channelKey);
         this.queue.reset();
+        this.queue.removeAllListeners();
       }
     } catch (error) {
       return false;
@@ -600,6 +652,15 @@ export default class Player extends EventEmitter {
     return true;
   }
   destroy() {
+    this.connection.removeAllListeners("state");
+    this.connection.removeAllListeners("roomfetched");
+    this.connection.removeAllListeners("userJoin");
+    this.connection.removeAllListeners("userleave");
+    this.searches.clear();
+    for (const t of this._searchTimeouts) clearTimeout(t);
+    this._searchTimeouts.clear();
+    // Do NOT destroy the shared nodelink Manager here - it's owned by the Remix instance
+    this._cleanupCurrentStream();
     return this.connection.destroy();
   }
   /**
@@ -652,8 +713,8 @@ export default class Player extends EventEmitter {
         this.connection.on("state", (state) => {
           console.log(state);
           if (state == Revoice.State.IDLE && !roomFetched) {
+            roomFetched = true;
             this.emit("roomfetched", connection.users);
-            // TODO: set roomFetched to true?
           }
           this.state = state;
           if (state == Revoice.State.OFFLINE && !this.leaving) {
@@ -682,6 +743,8 @@ export default class Player extends EventEmitter {
         });
         list += "\nSend the number of the result you'd like to play here in this channel. Example: `2`\nTo cancel this process, just send an 'x'!";
         this.searches.set(id, data.data);
+        const searchTimeout = setTimeout(() => { this.searches.delete(id); this._searchTimeouts.delete(searchTimeout); }, 5 * 60 * 1000);
+        this._searchTimeouts.add(searchTimeout);
         res({ m: list, count: data.data.length });
       }).catch(error => {
         res(error);
@@ -707,6 +770,20 @@ export default class Player extends EventEmitter {
     if (prep) return prep;
 
     const events = new EventEmitter();
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      clearTimeout(safetyTimeout);
+      events.removeAllListeners();
+    };
+    // Safety timeout: auto-cleanup after 2 minutes if neither resolve nor reject fires
+    const safetyTimeout = setTimeout(() => {
+      if (cleanedUp) return;
+      console.warn("[Player] play() safety timeout triggered for query:", query);
+      events.emit("message", "Search timed out. Please try again.");
+      cleanup();
+    }, 120000);
     this.workerJob("generalQuery", { query: query, spotify: this.spotifyConfig, provider: provider }, (msg) => {
       events.emit("message", msg);
     }).then((data) => {
@@ -720,10 +797,12 @@ export default class Player extends EventEmitter {
         console.log("Unknown case: ", data.type, data);
       }
       if (!this.queue.getCurrent()) this.playNext();
+      cleanup();
     }).catch(reason => {
       console.log("reason", reason);
       reason = reason || "An error occured. Please contact the support if this happens reocurringly.";
       events.emit("message", reason);
+      cleanup();
     });
     return events;
   }

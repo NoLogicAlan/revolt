@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import path from "path";
+import { pathToFileURL } from "node:url";
 import { Client } from "revolt.js"
 import { CommandHandler, CommandLoader, HelpHandler, PrefixManager } from "./src/CommandHandler.mjs";
 import { Message, MessageHandler, PageBuilder } from "./src/MessageHandler.mjs";
@@ -51,6 +52,11 @@ export class Remix {
       console.log("Logged in as " + client.user.username);
     });
 
+    // Handle Revolt client errors to prevent uncaught exceptions
+    client.on("error", (err) => {
+      console.error("[Revolt] Client error:", err);
+    });
+
     const loader = new CommandLoader(commands, this);
     const __dirname = import.meta.dirname;
     const dir = path.join(__dirname, "commands");
@@ -64,10 +70,15 @@ export class Remix {
     this.modules = JSON.parse(fs.readFileSync("./storage/modules.json"));
     Promise.all(this.modules.map(async m => {
       if (!m.enabled) return;
-      const mod = { instance: (new ((await import(m.index)).default)(this)), c: (await import(m.index)).default };
+      const modulePath = path.resolve(m.index);
+      const moduleURL = pathToFileURL(modulePath).href;
+      const imported = await import(moduleURL);
+      const mod = { instance: (new (imported.default)(this)), c: imported.default };
       this.loadedModules.set(m.name, mod);
     })).then(() => {
       console.log("Modules loaded.");
+    }).catch(err => {
+      console.error("[Modules] Failed to load modules:", err);
     });
 
     this.revoice = new Revoice(config.token || config.login, config["stoat-api"] || config["revolt-api"]);
@@ -108,10 +119,10 @@ export class Remix {
     });
 
     this.comLink = (this.comHashLong) ? "https://github.com/remix-bot/stoat/tree/" + this.comHashLong : "https://github.com/remix-bot/stoat";
-    this.playerMap = new Map();
-    this.currPort = -1;
-    this.channels = [];
-    this.freed = [];
+
+    client.on("serverDelete", (server) => {
+      settings.deleteServer(server.id);
+    });
 
     client.loginBot(config.token);
   }
@@ -120,7 +131,22 @@ export class Remix {
    */
   close() {
     const players = this.players.close();
-    // TODO:
+    // Close settings manager (clears retry timer + ends MySQL pool)
+    if (this.settingsMgr?.close) this.settingsMgr.close();
+    // Close dashboard connections (MySQL pool + Redis)
+    if (this.dashboard?.db?.close) this.dashboard.db.close();
+    if (this.dashboard?.redis?.close) this.dashboard.redis.close();
+    // Close NodeLink manager
+    if (this.nodelink?.destroy) this.nodelink.destroy();
+    // Clean up RBL event listeners if the module is loaded
+    for (const [name, mod] of this.loadedModules) {
+      if (mod?.instance?.cleanup) mod.instance.cleanup();
+    }
+    this.loadedModules.clear();
+    this.observedVoiceUsers.clear();
+    // Disconnect the Revolt WebSocket client
+    try { this.client.logout(); } catch (_) {}
+    return players;
   }
 
   getSettings(message) {
@@ -141,9 +167,8 @@ export class Remix {
    * @returns {Promise<Object[]>}
    */
   getSharedServers(user) {
-    return new Promise(async (res, _rej) => {
-      const data = await user.fetchMutual();
-      if (!data) res(null);
+    return user.fetchMutual().then(data => {
+      if (!data) return null;
       var servers = data.servers.map(s => this.client.servers.get(s));
 
       servers = servers.map((server) => {
@@ -158,11 +183,11 @@ export class Remix {
           name: server.name,
           id: server.id,
           icon: icon(),
-          voiceChannels: server.channels.filter(c => c.isVoice).map(c => ({ name: c.name, id: c.id, icon: c.animatedIconURL || c.iconURL || null })) // TODO: fetch users as well
+          voiceChannels: server.channels.filter(c => c.isVoice).map(c => ({ name: c.name, id: c.id, icon: c.animatedIconURL || c.iconURL || null }))
         }
       });
-      res(servers);
-    });
+      return servers;
+    }).catch(() => null);
   }
   /**
    * @param {string} form
@@ -226,4 +251,10 @@ process.on("uncaughtExceptionMonitor", (err, origin) => {
 process.on("SIGINT", () => {
   console.log("SIGINT received, storing current state");
   remix.close();
+  process.exit(0);
+});
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, storing current state");
+  remix.close();
+  process.exit(0);
 });

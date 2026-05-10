@@ -8,6 +8,7 @@ function awaitMessage(msg, count, player) {
   const unobserve = channel.onMessageUser((m) => {
     if (m.content.trim().toLowerCase() == "x") {
       unobserve();
+      clearTimeout(timeout);
       return m.replyEmbed("Cancelled!");
     }
     let c = parseInt(m.content.trim().replace(/\./g, ""));
@@ -16,7 +17,11 @@ function awaitMessage(msg, count, player) {
     let v = player.playResult(msg.authorId, c - 1);
     m.replyEmbed((typeof v == "string") ? v : `Added [${v.title}](${v.url}) to the queue!`);
     unobserve();
+    clearTimeout(timeout);
   }, msg.author);
+  const timeout = setTimeout(() => {
+    unobserve();
+  }, 2 * 60 * 1000);
 }
 
 export const command = new CommandBuilder()
